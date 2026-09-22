@@ -1,1 +1,887 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>FluxCaja</title>
+<meta name="description" content="Flujo de caja multiempresa y multicuenta">
+<meta name="theme-color" content="#1f4d3a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="config.js"></script>
+<style>
+:root{
+  --bg:#f4f6f3;--card:#fff;--ink:#1c2420;--muted:#66706a;--line:#dfe5e0;
+  --brand:#1f4d3a;--brand2:#2e7355;--in:#1f7a4d;--out:#b3402f;--warn:#b7791f;
+  --soft:#eef3ef;--radius:10px;--shadow:0 1px 3px rgba(0,0,0,.08);
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+header.top{position:sticky;top:0;z-index:20;background:var(--brand);color:#fff;padding:10px 16px;padding-top:calc(10px + env(safe-area-inset-top));display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+header.top h1{font-size:18px;margin:0;font-weight:700;letter-spacing:.3px}
+header.top .sp{flex:1}
+header.top select{background:#fff2;color:#fff;border:1px solid #fff5;border-radius:8px;padding:6px 8px;max-width:220px}
+header.top select option{color:#000}
+nav.tabs{display:flex;gap:4px}
+nav.tabs button{background:none;border:0;color:#fffc;padding:7px 12px;border-radius:8px;cursor:pointer}
+nav.tabs button.on{background:#fff2;color:#fff;font-weight:600}
+main{max-width:1400px;margin:0 auto;padding:16px}
+.banner{background:#fff4d6;border:1px solid #f0d58a;padding:8px 12px;border-radius:8px;margin-bottom:12px;font-size:13px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px;margin-bottom:14px}
+.card h2{font-size:15px;margin:0 0 10px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
+.row>label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+input,select,textarea{border:1px solid var(--line);border-radius:8px;padding:7px 9px;background:#fff;min-width:0}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--brand2);outline-offset:-1px}
+.btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:7px 12px;cursor:pointer;white-space:nowrap}
+.btn:hover{background:var(--soft)}
+.btn.pri{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn.pri:hover{background:var(--brand2)}
+.btn.dan{color:var(--out);border-color:#e8c3bd}
+.btn.sm{padding:4px 8px;font-size:12px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:14px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px}
+.kpi .l{font-size:12px;color:var(--muted)}
+.kpi .v{font-size:20px;font-weight:700;margin-top:2px;font-variant-numeric:tabular-nums}
+.kpi .s{font-size:11px;color:var(--muted)}
+.pos{color:var(--in)}.neg{color:var(--out)}
+.tw{overflow:auto;max-width:100%;border:1px solid var(--line);border-radius:8px;background:#fff}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{padding:6px 9px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{background:var(--soft);font-weight:600;font-size:12px;position:sticky;top:0;z-index:1}
+td.n,th.n{text-align:right}
+table.flujo td:first-child,table.flujo th:first-child{position:sticky;left:0;background:#fff;z-index:2;min-width:190px}
+table.flujo th:first-child{background:var(--soft);z-index:3}
+table.flujo tr.sec td{background:#f7f9f7;font-weight:700;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+table.flujo tr.tot td{font-weight:700;border-top:2px solid var(--line)}
+table.flujo tr.saldo td{font-weight:700;background:#f2f7f3}
+table.flujo tr.saldo td:first-child{background:#f2f7f3}
+table.flujo td.click{cursor:pointer}
+table.flujo td.click:hover{background:#e9f3ec}
+tr.pagado td{color:#98a09b;text-decoration:line-through}
+.tag{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;background:var(--soft);color:var(--brand)}
+.tag.cxp{background:#fbecea;color:var(--out)}.tag.cxc{background:#e7f4ec;color:var(--in)}.tag.man{background:#fff4d6;color:#8a5a00}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.muted{color:var(--muted)}.small{font-size:12px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+.modal-bg{position:fixed;inset:0;background:#0006;z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:4vh 12px;overflow:auto}
+.modal{background:#fff;border-radius:12px;max-width:640px;width:100%;padding:18px;box-shadow:0 10px 40px #0004}
+.modal.wide{max-width:1000px}
+.modal h3{margin:0 0 12px}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.form label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+.form .full{grid-column:1/-1}
+.actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1c2420;color:#fff;padding:10px 16px;border-radius:8px;z-index:60;box-shadow:0 4px 12px #0004;max-width:90vw}
+.chart{width:100%;height:190px}
+.login{max-width:360px;margin:12vh auto}
+.bulk{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:8px 0}
+.hide{display:none!important}
+@media (max-width:760px){
+  header.top{padding:8px 12px;padding-top:calc(8px + env(safe-area-inset-top))}
+  header.top h1{font-size:16px}
+  header.top select{max-width:170px}
+  nav.tabs{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);justify-content:space-around;padding:4px 4px calc(4px + env(safe-area-inset-bottom));z-index:30}
+  nav.tabs button{color:var(--muted);font-size:11px;padding:6px 4px;display:flex;flex-direction:column;align-items:center;gap:1px;flex:1}
+  nav.tabs button .ic{font-size:18px}
+  nav.tabs button.on{background:var(--soft);color:var(--brand)}
+  main{padding:12px 12px 90px}
+  .form{grid-template-columns:1fr}
+  .kpi .v{font-size:17px}
+  table.cards thead{display:none}
+  table.cards,table.cards tbody,table.cards tr,table.cards td{display:block;width:100%}
+  table.cards tr{border-bottom:1px solid var(--line);padding:8px 10px}
+  table.cards td{border:0;padding:1px 0;white-space:normal;text-align:left!important}
+  table.cards td[data-l]::before{content:attr(data-l) ": ";color:var(--muted);font-size:12px}
+}
+@media (min-width:761px){nav.tabs button .ic,nav.tabs .sm{display:none}}
+@media (max-width:760px){nav.tabs .lg{display:none}.banner{font-size:12px;padding:6px 10px}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+'use strict';
+/* =====================================================================
+   FluxCaja · Flujo de caja multiempresa / multicuenta
+   Datos: Firebase Firestore (config.js) o modo local (localStorage)
+   ===================================================================== */
+const PFX = 'fc_';                       // prefijo de colecciones en Firestore
+const COLS = ['empresas','cuentas','movimientos','config'];
+const CAT_CXC = 'Cobranza clientes', CAT_CXP = 'Pago proveedores';
+const CATEGORIAS = {
+  ingreso:['Cobranza clientes','Crédito bancario (desembolso)','Línea de crédito (giro)','Aporte de socios','Préstamo empresa relacionada','Traspaso entre cuentas','Venta de activos','Otros ingresos'],
+  egreso:['Pago proveedores','Cuota crédito bancario','Leasing','Línea de crédito (abono)','Remuneraciones','Impuestos (F29 / F22)','Imposiciones','Arriendos','Retiro de socios','Préstamo empresa relacionada','Traspaso entre cuentas','Otros egresos']
+};
 
+/* ---------- utilidades ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad = n => String(n).padStart(2,'0');
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const pDate = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
+const today = () => ymd(new Date());
+const addDays = (s,n) => { const d = pDate(s); d.setDate(d.getDate()+n); return ymd(d); };
+const addMonths = (s,n) => { const d = pDate(s); const day = d.getDate(); d.setDate(1); d.setMonth(d.getMonth()+n); const last = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate(); d.setDate(Math.min(day,last)); return ymd(d); };
+const MES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const fDate = s => { if(!s) return ''; const [y,m,d] = s.split('-'); return `${d}-${m}-${y}`; };
+const fmt = n => (n<0?'-':'') + '$' + Math.abs(Math.round(n||0)).toLocaleString('es-CL');
+const fmtK = n => { const a=Math.abs(n); const s = a>=1e9? (a/1e9).toFixed(1)+' MM' : a>=1e6? (a/1e6).toFixed(1)+' M' : a>=1e3? Math.round(a/1e3)+' K' : Math.round(a); return (n<0?'-':'')+'$'+s; };
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,9);
+function hashId(s){let h1=0xdeadbeef,h2=0x41c6ce57;for(let i=0;i<s.length;i++){const c=s.charCodeAt(i);h1=Math.imul(h1^c,2654435761);h2=Math.imul(h2^c,1597334677);}h1=Math.imul(h1^(h1>>>16),2246822507)^Math.imul(h2^(h2>>>13),3266489909);h2=Math.imul(h2^(h2>>>16),2246822507)^Math.imul(h1^(h1>>>13),3266489909);return (h2>>>0).toString(16).padStart(8,'0')+(h1>>>0).toString(16).padStart(8,'0');}
+const ls = { get(k,d){ try{ const v = localStorage.getItem(k); return v==null? d : JSON.parse(v); }catch(e){ return d; } }, set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} } };
+function toast(msg, ms=2600){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(), ms); }
+const normRut = r => String(r||'').toUpperCase().replace(/[^0-9K]/g,'');
+function parseMonto(v){
+  if(v==null || v==='') return null;
+  if(typeof v==='number') return Math.round(v);
+  let s = String(v).trim(); const neg = /^\(.*\)$/.test(s) || /^-/.test(s);
+  s = s.replace(/[^\d,\.]/g,''); if(!s) return null;
+  if(s.includes(',')) s = s.replace(/\./g,'').replace(',','.');
+  else if((s.match(/\./g)||[]).length>1 || /\.\d{3}$/.test(s)) s = s.replace(/\./g,'');
+  const n = parseFloat(s); if(isNaN(n)) return null; return Math.round(neg? -n : n);
+}
+function parseFecha(v){
+  if(v==null || v==='') return null;
+  if(v instanceof Date && !isNaN(v)) return ymd(v);
+  if(typeof v==='number' && v>20000 && v<80000){ const d = XLSX.SSF.parse_date_code(v); return `${d.y}-${pad(d.m)}-${pad(d.d)}`; }
+  const s = String(v).trim();
+  let m = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/); if(m) return `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
+  m = s.match(/^(\d{1,2})[-\/\.](\d{1,2})[-\/\.](\d{2,4})/);
+  if(m){ let y=+m[3]; if(y<100) y+=2000; return `${y}-${pad(m[2])}-${pad(m[1])}`; }
+  return null;
+}
+
+/* =====================================================================
+   STORE: capa de datos (Firestore o local)
+   ===================================================================== */
+const Store = {
+  mode:'local', db:null, user:null,
+  data:{empresas:[],cuentas:[],movimientos:[],config:[]},
+  unsub:[],
+  get hasFirebase(){ const c = window.FLUXCAJA_FIREBASE; return !!(c && c.apiKey && c.projectId && window.firebase); },
+  initLocal(){
+    this.mode='local';
+    const d = ls.get('fluxcaja_local_v1', null);
+    if(d) COLS.forEach(c => this.data[c] = d[c] || []);
+  },
+  saveLocal(){ ls.set('fluxcaja_local_v1', this.data); },
+  async initFirebase(){
+    this.mode='firebase';
+    firebase.initializeApp(window.FLUXCAJA_FIREBASE);
+    this.db = firebase.firestore();
+    try{ await this.db.enablePersistence({synchronizeTabs:true}); }catch(e){ console.warn('Persistencia offline no disponible', e.code); }
+    return new Promise(res => {
+      firebase.auth().onAuthStateChanged(u => {
+        this.user = u; this.unsub.forEach(f=>f()); this.unsub=[];
+        if(u) this.subscribe();
+        res(); render();
+      });
+    });
+  },
+  subscribe(){
+    COLS.forEach(c => {
+      const f = this.db.collection(PFX+c).onSnapshot(snap => {
+        this.data[c] = snap.docs.map(d => ({...d.data(), id:d.id}));
+        scheduleRender();
+      }, err => { console.error(err); toast('Error de lectura: '+err.message, 5000); });
+      this.unsub.push(f);
+    });
+  },
+  async putMany(col, arr){
+    if(!arr.length) return;
+    arr.forEach(o => { if(!o.id) o.id = uid(); o.upd = Date.now(); });
+    if(this.mode==='local'){
+      const map = new Map(this.data[col].map(o=>[o.id,o]));
+      arr.forEach(o => map.set(o.id, {...o}));
+      this.data[col] = [...map.values()]; this.saveLocal(); scheduleRender(); return;
+    }
+    for(let i=0;i<arr.length;i+=400){
+      const b = this.db.batch();
+      arr.slice(i,i+400).forEach(o => { const {id,...rest} = o; b.set(this.db.collection(PFX+col).doc(id), clean(rest)); });
+      await b.commit();
+    }
+  },
+  put(col, o){ return this.putMany(col,[o]); },
+  async delMany(col, ids){
+    if(!ids.length) return;
+    if(this.mode==='local'){ const s=new Set(ids); this.data[col] = this.data[col].filter(o=>!s.has(o.id)); this.saveLocal(); scheduleRender(); return; }
+    for(let i=0;i<ids.length;i+=400){
+      const b = this.db.batch(); ids.slice(i,i+400).forEach(id => b.delete(this.db.collection(PFX+col).doc(id))); await b.commit();
+    }
+  },
+  del(col,id){ return this.delMany(col,[id]); },
+};
+function clean(o){ const r={}; for(const k in o){ if(o[k]!==undefined) r[k]=o[k]; } return r; }
+const E = () => [...Store.data.empresas].sort((a,b)=>(a.orden??0)-(b.orden??0) || a.nombre.localeCompare(b.nombre));
+const empresa = id => Store.data.empresas.find(e=>e.id===id);
+const cuenta = id => Store.data.cuentas.find(c=>c.id===id);
+const cuentasDe = eid => Store.data.cuentas.filter(c=>c.empresaId===eid).sort((a,b)=>(b.porDefecto?1:0)-(a.porDefecto?1:0) || (a.alias||'').localeCompare(b.alias||''));
+const cuentaLabel = c => c ? `${c.alias || c.banco} ${c.numero? '· '+c.numero : ''}`.trim() : '(sin cuenta)';
+const cfg = key => (Store.data.config.find(c=>c.id===key)||{}).valor;
+const fEf = m => m.fechaProg || m.fecha;            // fecha efectiva (reprogramada o vencimiento)
+const efecto = m => (m.tipo==='ingreso'? 1 : -1) * (m.monto||0);
+
+/* =====================================================================
+   ESTADO DE UI
+   ===================================================================== */
+const UI = {
+  tab: ls.get('fc_tab','flujo'),
+  emp: ls.get('fc_emp','*'),
+  flujo: ls.get('fc_flujo', {cta:'*', gran:'sem', n:13}),
+  mov: {cta:'*', origen:'*', estado:'pend', q:'', desde:'', hasta:'', sel:new Set()},
+  imp: null,
+};
+let _rt=null; function scheduleRender(){ clearTimeout(_rt); _rt = setTimeout(render, 30); }
+function setTab(t){ UI.tab=t; ls.set('fc_tab',t); render(); window.scrollTo(0,0); }
+function setEmp(v){ UI.emp=v; ls.set('fc_emp',v); UI.flujo.cta='*'; UI.mov.cta='*'; UI.mov.sel.clear(); render(); }
+
+/* =====================================================================
+   RENDER PRINCIPAL
+   ===================================================================== */
+function render(){
+  const app = $('#app');
+  if(Store.mode==='firebase' && !Store.user){ app.innerHTML = viewLogin(); return; }
+  if(UI.emp!=='*' && !empresa(UI.emp)) UI.emp='*';
+  const tabs = [['flujo','📈','Flujo'],['mov','📋','Movimientos'],['imp','📥','Importar'],['ctas','🏦','Empresas y cuentas'],['ajustes','⚙️','Ajustes']];
+  app.innerHTML = `
+  <header class="top">
+    <h1>FluxCaja</h1>
+    <select id="selEmp" onchange="setEmp(this.value)" title="Empresa">
+      <option value="*">Holding (todas)</option>
+      ${E().map(e=>`<option value="${e.id}" ${UI.emp===e.id?'selected':''}>${esc(e.nombre)}</option>`).join('')}
+    </select>
+    <span class="sp"></span>
+    <nav class="tabs">${tabs.map(([k,ic,l])=>`<button class="${UI.tab===k?'on':''}" onclick="setTab('${k}')"><span class="ic">${ic}</span>${k==='ctas'?'<span class="lg">Empresas y cuentas</span><span class="sm">Cuentas</span>':l}</button>`).join('')}</nav>
+  </header>
+  <main>
+    ${Store.mode==='local' ? `<div class="banner">Modo local: los datos se guardan solo en este navegador. Configura Firebase en <b>config.js</b> para sincronizar PC y celular.</div>`:''}
+    ${!Store.data.empresas.length && UI.tab!=='ajustes' ? viewBienvenida() : ({flujo:viewFlujo, mov:viewMov, imp:viewImp, ctas:viewCtas, ajustes:viewAjustes}[UI.tab]||viewFlujo)()}
+  </main>`;
+  afterRender();
+}
+function afterRender(){ if(UI.tab==='flujo') drawChart(); }
+
+function viewLogin(){
+  return `<div class="login card"><h2>FluxCaja · Ingresar</h2>
+    <form onsubmit="doLogin(event)" class="form" style="grid-template-columns:1fr">
+      <label>Correo<input id="lgE" type="email" required autocomplete="username"></label>
+      <label>Contraseña<input id="lgP" type="password" required autocomplete="current-password"></label>
+      <button class="btn pri">Entrar</button>
+      <div id="lgErr" class="small neg"></div>
+    </form>
+    <p class="small muted">Los usuarios se crean en Firebase Console › Authentication.</p></div>`;
+}
+async function doLogin(ev){
+  ev.preventDefault();
+  try{ await firebase.auth().signInWithEmailAndPassword($('#lgE').value.trim(), $('#lgP').value); }
+  catch(e){ $('#lgErr').textContent = 'No se pudo ingresar: ' + (e.code||e.message); }
+}
+
+function viewBienvenida(){
+  return `<div class="card"><h2>Comencemos</h2>
+    <p>Crea tus empresas y sus cuentas corrientes con el saldo actual. Luego importa el Excel de documentos por pagar y por cobrar, y agrega movimientos manuales (créditos, leasing, remuneraciones, etc.).</p>
+    <div class="row"><button class="btn pri" onclick="editEmpresa()">+ Crear empresa</button>
+    ${Store.mode==='local'?'<button class="btn" onclick="cargarDemo()">Cargar datos de ejemplo</button>':''}</div></div>`;
+}
+
+/* =====================================================================
+   VISTA: FLUJO
+   ===================================================================== */
+function periodos(gran, n){
+  const res=[]; const t = today();
+  let ini;
+  if(gran==='sem'){ const d=pDate(t); const dow=(d.getDay()+6)%7; ini = addDays(t,-dow); }
+  else ini = t.slice(0,8)+'01';
+  for(let i=0;i<n;i++){
+    let fin, label;
+    if(gran==='sem'){ fin = addDays(ini,6); const d=pDate(ini); label = `${pad(d.getDate())}-${MES[d.getMonth()]}`; }
+    else if(gran==='dia'){ fin = ini; const d=pDate(ini); label = `${pad(d.getDate())}-${MES[d.getMonth()]}`; }
+    else { fin = addDays(addMonths(ini,1),-1); const d=pDate(ini); label = `${MES[d.getMonth()]}-${String(d.getFullYear()).slice(2)}`; }
+    res.push({ini, fin, label});
+    ini = addDays(fin,1);
+  }
+  return res;
+}
+function calcFlujo(empSel, ctaSel, gran, n){
+  const t = today();
+  let ini = gran==='dia'? t : null;
+  const pers = gran==='dia' ? (()=>{const r=[];let d=t;for(let i=0;i<n;i++){const x=pDate(d);r.push({ini:d,fin:d,label:`${pad(x.getDate())}-${MES[x.getMonth()]}`});d=addDays(d,1);}return r;})() : periodos(gran,n);
+  const cols = [{ini:'0000-00-00', fin:addDays(t,-1), label:'Vencido', venc:true}, ...pers];
+  const ctas = Store.data.cuentas.filter(c => (empSel==='*' || c.empresaId===empSel) && (ctaSel==='*' || c.id===ctaSel));
+  const saldoIni = ctas.reduce((s,c)=>s+(+c.saldo||0),0);
+  const cupo = ctas.reduce((s,c)=>s+(+c.cupoLinea||0),0);
+  const movs = Store.data.movimientos.filter(m => m.estado!=='pagado' && (empSel==='*' || m.empresaId===empSel) && (ctaSel==='*' || m.cuentaId===ctaSel));
+  const cells = {ingreso:{}, egreso:{}}; const ids = {};
+  let fuera = 0;
+  const hMax = cols[cols.length-1].fin;
+  movs.forEach(m => {
+    const f = fEf(m); if(!f) return;
+    if(f > hMax){ fuera++; return; }
+    let ci = f < t ? 0 : cols.findIndex((c,i)=> i>0 && f>=c.ini && f<=c.fin);
+    if(ci<0){ ci = 1; } // antes del primer período (mismo día/semana en curso)
+    const cat = m.categoria || (m.tipo==='ingreso'?'Otros ingresos':'Otros egresos');
+    const tbl = cells[m.tipo]; (tbl[cat] ||= Array(cols.length).fill(0))[ci] += (m.monto||0);
+    ((ids[m.tipo+'|'+cat] ||= Array.from({length:cols.length},()=>[]))[ci]).push(m.id);
+  });
+  const sum = tbl => cols.map((_,i)=>Object.values(tbl).reduce((s,a)=>s+a[i],0));
+  const ti = sum(cells.ingreso), te = sum(cells.egreso);
+  const neto = cols.map((_,i)=>ti[i]-te[i]);
+  const sIni=[], sFin=[]; let s = saldoIni;
+  cols.forEach((_,i)=>{ sIni.push(s); s+=neto[i]; sFin.push(s); });
+  const cxc = movs.filter(m=>m.tipo==='ingreso' && m.origen==='cxc').reduce((a,m)=>a+m.monto,0);
+  const cxp = movs.filter(m=>m.tipo==='egreso' && m.origen==='cxp').reduce((a,m)=>a+m.monto,0);
+  let min = Infinity, minI = 0; sFin.forEach((v,i)=>{ if(v<min){min=v;minI=i;} });
+  return {cols, cells, ids, ti, te, neto, sIni, sFin, saldoIni, cupo, cxc, cxp, fuera, min, minCol: cols[minI], ctas};
+}
+let _flujo = null;
+function viewFlujo(){
+  const F = UI.flujo;
+  const ctasOpt = (UI.emp==='*'? Store.data.cuentas : cuentasDe(UI.emp));
+  if(F.cta!=='*' && !ctasOpt.find(c=>c.id===F.cta)) F.cta='*';
+  const r = _flujo = calcFlujo(UI.emp, F.cta, F.gran, F.n);
+  const catsI = Object.keys(r.cells.ingreso).sort((a,b)=>CATEGORIAS.ingreso.indexOf(a)-CATEGORIAS.ingreso.indexOf(b));
+  const catsE = Object.keys(r.cells.egreso).sort((a,b)=>CATEGORIAS.egreso.indexOf(a)-CATEGORIAS.egreso.indexOf(b));
+  const num = (v, cls='') => `<td class="n ${cls} ${v<0?'neg':''}">${v? fmt(v): '<span class="muted">-</span>'}</td>`;
+  const catRow = (tipo,cat) => `<tr><td>${esc(cat)}</td>${r.cells[tipo][cat].map((v,i)=>`<td class="n ${v?'click':''}" ${v?`onclick="drill('${tipo}','${esc(cat).replace(/'/g,"\\'")}',${i})"`:''}>${v?fmt(v):'<span class="muted">-</span>'}</td>`).join('')}</tr>`;
+  const ultimo = r.sFin[r.sFin.length-1];
+  return `
+  <div class="kpis">
+    <div class="kpi"><div class="l">Saldo bancos hoy</div><div class="v ${r.saldoIni<0?'neg':''}">${fmt(r.saldoIni)}</div><div class="s">${r.ctas.length} cuenta(s)${r.cupo?` · líneas ${fmtK(r.cupo)}`:''}</div></div>
+    <div class="kpi"><div class="l">Por cobrar (CxC)</div><div class="v pos">${fmt(r.cxc)}</div><div class="s">Vencido: ${fmt(r.cells.ingreso[CAT_CXC]?.[0]||0)}</div></div>
+    <div class="kpi"><div class="l">Por pagar (CxP)</div><div class="v neg">${fmt(r.cxp)}</div><div class="s">Vencido: ${fmt(r.cells.egreso[CAT_CXP]?.[0]||0)}</div></div>
+    <div class="kpi"><div class="l">Saldo al ${fDate(r.cols[r.cols.length-1].fin)}</div><div class="v ${ultimo<0?'neg':''}">${fmt(ultimo)}</div><div class="s">${r.fuera? r.fuera+' mov. fuera del horizonte':'&nbsp;'}</div></div>
+    <div class="kpi"><div class="l">Saldo mínimo proyectado</div><div class="v ${r.min<0?'neg':''}">${fmt(r.min)}</div><div class="s">${esc(r.minCol.label)}${r.min<0 && r.cupo? ` · con líneas ${fmt(r.min+r.cupo)}`:''}</div></div>
+  </div>
+  <div class="card">
+    <div class="row" style="margin-bottom:10px">
+      <label>Cuenta<select onchange="UI.flujo.cta=this.value;saveF()"><option value="*">Todas las cuentas</option>${ctasOpt.map(c=>`<option value="${c.id}" ${F.cta===c.id?'selected':''}>${UI.emp==='*'? esc(empresa(c.empresaId)?.nombre||'')+' · ':''}${esc(cuentaLabel(c))}</option>`).join('')}</select></label>
+      <label>Periodicidad<select onchange="UI.flujo.gran=this.value;UI.flujo.n={dia:30,sem:13,mes:12}[this.value];saveF()">
+        <option value="dia" ${F.gran==='dia'?'selected':''}>Diaria</option><option value="sem" ${F.gran==='sem'?'selected':''}>Semanal</option><option value="mes" ${F.gran==='mes'?'selected':''}>Mensual</option></select></label>
+      <label>Períodos<input type="number" min="1" max="60" value="${F.n}" style="width:80px" onchange="UI.flujo.n=Math.max(1,Math.min(60,+this.value||1));saveF()"></label>
+      <span style="flex:1"></span>
+      <button class="btn" onclick="nuevoMov()">+ Movimiento</button>
+      <button class="btn" onclick="exportFlujo()">Exportar Excel</button>
+    </div>
+    <svg id="chart" class="chart"></svg>
+  </div>
+  <div class="tw" style="max-height:70vh">
+  <table class="flujo">
+    <thead><tr><th>Concepto</th>${r.cols.map(c=>`<th class="n" title="${c.venc?'Documentos con fecha anterior a hoy aún pendientes':fDate(c.ini)+' a '+fDate(c.fin)}">${esc(c.label)}</th>`).join('')}</tr></thead>
+    <tbody>
+      <tr class="saldo"><td>Saldo inicial</td>${r.sIni.map(v=>num(v)).join('')}</tr>
+      <tr class="sec"><td>Ingresos</td>${r.cols.map(()=>'<td></td>').join('')}</tr>
+      ${catsI.map(c=>catRow('ingreso',c)).join('') || `<tr><td class="muted">Sin ingresos</td>${r.cols.map(()=>'<td></td>').join('')}</tr>`}
+      <tr class="tot"><td>Total ingresos</td>${r.ti.map(v=>num(v,'pos')).join('')}</tr>
+      <tr class="sec"><td>Egresos</td>${r.cols.map(()=>'<td></td>').join('')}</tr>
+      ${catsE.map(c=>catRow('egreso',c)).join('') || `<tr><td class="muted">Sin egresos</td>${r.cols.map(()=>'<td></td>').join('')}</tr>`}
+      <tr class="tot"><td>Total egresos</td>${r.te.map(v=>num(v)).join('')}</tr>
+      <tr class="tot"><td>Flujo neto</td>${r.neto.map(v=>num(v)).join('')}</tr>
+      <tr class="saldo"><td>Saldo final</td>${r.sFin.map(v=>num(v)).join('')}</tr>
+    </tbody>
+  </table></div>
+  ${UI.emp==='*' ? viewResumenEmpresas() : ''}`;
+}
+function saveF(){ ls.set('fc_flujo', {...UI.flujo}); render(); }
+function viewResumenEmpresas(){
+  const lim = addDays(today(), 30);
+  const rows = E().map(e => {
+    const saldo = cuentasDe(e.id).reduce((s,c)=>s+(+c.saldo||0),0);
+    const pend = Store.data.movimientos.filter(m=>m.empresaId===e.id && m.estado!=='pagado');
+    const cxc = pend.filter(m=>m.origen==='cxc').reduce((s,m)=>s+m.monto,0);
+    const cxp = pend.filter(m=>m.origen==='cxp').reduce((s,m)=>s+m.monto,0);
+    const p30 = saldo + pend.filter(m=>fEf(m)<=lim).reduce((s,m)=>s+efecto(m),0);
+    return `<tr style="cursor:pointer" onclick="setEmp('${e.id}')"><td data-l="Empresa"><span class="dot" style="background:${esc(e.color||'#888')}"></span>${esc(e.nombre)}</td><td class="n" data-l="Saldo bancos">${fmt(saldo)}</td><td class="n pos" data-l="CxC">${fmt(cxc)}</td><td class="n neg" data-l="CxP">${fmt(cxp)}</td><td class="n ${p30<0?'neg':''}" data-l="Saldo a 30 días"><b>${fmt(p30)}</b></td></tr>`;
+  }).join('');
+  return `<div class="card" style="margin-top:14px"><h2>Resumen por empresa</h2><div class="tw"><table class="cards"><thead><tr><th>Empresa</th><th class="n">Saldo bancos</th><th class="n">Por cobrar</th><th class="n">Por pagar</th><th class="n">Saldo a 30 días</th></tr></thead><tbody>${rows}</tbody></table></div>
+  <p class="small muted">Los traspasos y préstamos entre empresas del holding se compensan en la vista consolidada.</p></div>`;
+}
+function drawChart(){
+  const svg = $('#chart'); if(!svg || !_flujo) return;
+  const W = svg.clientWidth || 800, H = 190, P = {l:8,r:8,t:14,b:22};
+  const v = _flujo.sFin, lab = _flujo.cols.map(c=>c.label);
+  const mx = Math.max(0,...v), mn = Math.min(0,...v); const rng = (mx-mn)||1;
+  const y = x => P.t + (mx-x)/rng*(H-P.t-P.b);
+  const bw = (W-P.l-P.r)/v.length;
+  let s = `<line x1="${P.l}" x2="${W-P.r}" y1="${y(0)}" y2="${y(0)}" stroke="#bbb"/>`;
+  v.forEach((val,i)=>{
+    const x = P.l + i*bw + bw*.15, w = bw*.7, y0=y(0), y1=y(val);
+    s += `<rect x="${x}" y="${Math.min(y0,y1)}" width="${w}" height="${Math.max(1,Math.abs(y1-y0))}" rx="2" fill="${val<0?'#c9594a':(i===0?'#9fb8aa':'#2e7355')}"><title>${lab[i]}: ${fmt(val)}</title></rect>`;
+    if(v.length<=20 || i%Math.ceil(v.length/15)===0) s += `<text x="${x+w/2}" y="${H-6}" font-size="10" text-anchor="middle" fill="#66706a">${esc(lab[i])}</text>`;
+  });
+  s += `<text x="${P.l}" y="10" font-size="10" fill="#66706a">Saldo final por período · máx ${fmtK(mx)}${mn<0?' · mín '+fmtK(mn):''}</text>`;
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.innerHTML = s;
+}
+addEventListener('resize', ()=>{ clearTimeout(window._rz); window._rz=setTimeout(()=>{ if(UI.tab==='flujo') drawChart(); },150); });
+function drill(tipo, cat, ci){
+  const ids = new Set(_flujo.ids[tipo+'|'+cat][ci]);
+  const ms = Store.data.movimientos.filter(m=>ids.has(m.id)).sort((a,b)=>fEf(a).localeCompare(fEf(b)));
+  modal(`<h3>${esc(cat)} · ${esc(_flujo.cols[ci].label)}</h3>${tablaMov(ms,false)}
+    <div class="actions"><button class="btn" onclick="closeModal()">Cerrar</button></div>`, true);
+}
+function exportFlujo(){
+  const r = _flujo; const head = ['Concepto', ...r.cols.map(c=>c.venc?'Vencido':`${c.label} (${fDate(c.ini)})`)];
+  const aoa = [[`Flujo de caja · ${UI.emp==='*'?'Holding consolidado':empresa(UI.emp).nombre} · ${fDate(today())}`],[],head,['Saldo inicial',...r.sIni],['INGRESOS']];
+  Object.entries(r.cells.ingreso).forEach(([k,v])=>aoa.push([k,...v])); aoa.push(['Total ingresos',...r.ti],['EGRESOS']);
+  Object.entries(r.cells.egreso).forEach(([k,v])=>aoa.push([k,...v])); aoa.push(['Total egresos',...r.te],['Flujo neto',...r.neto],['Saldo final',...r.sFin]);
+  const ws = XLSX.utils.aoa_to_sheet(aoa); ws['!cols']=[{wch:32},...r.cols.map(()=>({wch:14}))];
+  const det = Store.data.movimientos.filter(m=>m.estado!=='pagado' && (UI.emp==='*'||m.empresaId===UI.emp)).sort((a,b)=>fEf(a).localeCompare(fEf(b)))
+    .map(m=>({Empresa:empresa(m.empresaId)?.nombre, Cuenta:cuentaLabel(cuenta(m.cuentaId)), Tipo:m.tipo, Categoria:m.categoria, Fecha:fDate(fEf(m)), Vencimiento:fDate(m.fecha), Contraparte:m.contraparte, RUT:m.rut, Documento:[m.tipoDoc,m.folio].filter(Boolean).join(' '), Glosa:m.glosa, Monto:m.monto, Efecto:efecto(m)}));
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Flujo'); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(det), 'Detalle pendientes');
+  XLSX.writeFile(wb, `flujo_caja_${today()}.xlsx`);
+}
+
+/* =====================================================================
+   VISTA: MOVIMIENTOS
+   ===================================================================== */
+function filtrarMov(){
+  const f = UI.mov; const q = f.q.trim().toLowerCase();
+  return Store.data.movimientos.filter(m =>
+    (UI.emp==='*' || m.empresaId===UI.emp) && (f.cta==='*' || m.cuentaId===f.cta || (f.cta==='-' && !m.cuentaId)) &&
+    (f.origen==='*' || m.origen===f.origen) &&
+    (f.estado==='*' || (f.estado==='pend' ? m.estado!=='pagado' : m.estado==='pagado')) &&
+    (!f.desde || fEf(m)>=f.desde) && (!f.hasta || fEf(m)<=f.hasta) &&
+    (!q || [m.contraparte,m.rut,m.folio,m.glosa,m.categoria,m.tipoDoc].join(' ').toLowerCase().includes(q))
+  ).sort((a,b)=>fEf(a).localeCompare(fEf(b)));
+}
+function tablaMov(ms, selectable){
+  const t = today(); const lim = 600;
+  const rows = ms.slice(0,lim).map(m => {
+    const e = empresa(m.empresaId); const venc = m.estado!=='pagado' && fEf(m)<t;
+    return `<tr class="${m.estado==='pagado'?'pagado':''}">
+      ${selectable?`<td><input type="checkbox" ${UI.mov.sel.has(m.id)?'checked':''} onchange="selMov('${m.id}',this.checked)"></td>`:''}
+      <td data-l="Fecha" class="${venc?'neg':''}">${fDate(fEf(m))}${m.fechaProg && m.fechaProg!==m.fecha?` <span class="small muted" title="Vencimiento original">(${fDate(m.fecha)})</span>`:''}</td>
+      ${UI.emp==='*'?`<td data-l="Empresa"><span class="dot" style="background:${esc(e?.color||'#888')}"></span>${esc(e?.nombre||'?')}</td>`:''}
+      <td data-l="Cuenta">${esc(cuentaLabel(cuenta(m.cuentaId)))}</td>
+      <td data-l="Origen"><span class="tag ${m.origen}">${{cxc:'CxC',cxp:'CxP',manual:'Manual'}[m.origen]||m.origen}</span></td>
+      <td data-l="Categoría">${esc(m.categoria)}</td>
+      <td data-l="Contraparte" style="white-space:normal;min-width:160px">${esc(m.contraparte||'')}${m.rut?` <span class="small muted">${esc(m.rut)}</span>`:''}</td>
+      <td data-l="Doc">${esc([m.tipoDoc,m.folio].filter(Boolean).join(' '))}${m.cuota?` <span class="small muted">${esc(m.cuota)}</span>`:''}${m.glosa?` <span class="small muted">${esc(m.glosa)}</span>`:''}</td>
+      <td class="n ${m.tipo==='ingreso'?'pos':'neg'}" data-l="Monto">${fmt(efecto(m))}</td>
+      <td><button class="btn sm" onclick="editMov('${m.id}')">Editar</button></td></tr>`;
+  }).join('');
+  return `<div class="tw" style="max-height:65vh"><table class="cards"><thead><tr>${selectable?`<th><input type="checkbox" onchange="selTodos(this.checked)"></th>`:''}<th>Fecha</th>${UI.emp==='*'?'<th>Empresa</th>':''}<th>Cuenta</th><th>Origen</th><th>Categoría</th><th>Contraparte</th><th>Documento / glosa</th><th class="n">Monto</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="10" class="muted">Sin movimientos</td></tr>'}</tbody></table></div>
+  ${ms.length>lim?`<p class="small muted">Mostrando ${lim} de ${ms.length}. Usa los filtros para acotar.</p>`:''}`;
+}
+function viewMov(){
+  const f = UI.mov; const ms = filtrarMov();
+  const ctas = UI.emp==='*'? Store.data.cuentas : cuentasDe(UI.emp);
+  const tot = ms.reduce((s,m)=>s+efecto(m),0);
+  const n = [...f.sel].filter(id=>ms.find(m=>m.id===id)).length;
+  return `<div class="card">
+    <div class="row">
+      <label>Buscar<input value="${esc(f.q)}" placeholder="Contraparte, RUT, folio…" oninput="UI.mov.q=this.value;debRender()"></label>
+      <label>Cuenta<select onchange="UI.mov.cta=this.value;render()"><option value="*">Todas</option><option value="-" ${f.cta==='-'?'selected':''}>(sin cuenta)</option>${ctas.map(c=>`<option value="${c.id}" ${f.cta===c.id?'selected':''}>${esc(cuentaLabel(c))}</option>`).join('')}</select></label>
+      <label>Origen<select onchange="UI.mov.origen=this.value;render()">${[['*','Todos'],['cxc','Por cobrar'],['cxp','Por pagar'],['manual','Manual']].map(([k,l])=>`<option value="${k}" ${f.origen===k?'selected':''}>${l}</option>`).join('')}</select></label>
+      <label>Estado<select onchange="UI.mov.estado=this.value;render()">${[['pend','Pendientes'],['pag','Pagados'],['*','Todos']].map(([k,l])=>`<option value="${k}" ${f.estado===k?'selected':''}>${l}</option>`).join('')}</select></label>
+      <label>Desde<input type="date" value="${f.desde}" onchange="UI.mov.desde=this.value;render()"></label>
+      <label>Hasta<input type="date" value="${f.hasta}" onchange="UI.mov.hasta=this.value;render()"></label>
+      <span style="flex:1"></span>
+      <button class="btn pri" onclick="nuevoMov()">+ Movimiento manual</button>
+    </div>
+    <div class="bulk">
+      <span class="small muted">${ms.length} movimientos · neto <b class="${tot<0?'neg':'pos'}">${fmt(tot)}</b>${n?` · <b>${n} seleccionados</b>`:''}</span>
+      ${n?`<button class="btn sm" onclick="bulk('pagado')">Marcar pagado</button><button class="btn sm" onclick="bulk('pendiente')">Marcar pendiente</button><button class="btn sm" onclick="bulk('cuenta')">Asignar cuenta</button><button class="btn sm" onclick="bulk('fecha')">Reprogramar fecha</button><button class="btn sm dan" onclick="bulk('borrar')">Eliminar</button><button class="btn sm" onclick="UI.mov.sel.clear();render()">Quitar selección</button>`:''}
+    </div>
+    ${tablaMov(ms,true)}
+  </div>`;
+}
+let _db; function debRender(){ clearTimeout(_db); _db=setTimeout(()=>{ const p=document.activeElement; const pos=p?.selectionStart; render(); const i=document.querySelector('input[placeholder^="Contraparte"]'); if(i){i.focus(); try{i.setSelectionRange(pos,pos);}catch(e){}} },250); }
+function selMov(id,on){ on? UI.mov.sel.add(id) : UI.mov.sel.delete(id); render(); }
+function selTodos(on){ filtrarMov().slice(0,600).forEach(m=> on? UI.mov.sel.add(m.id): UI.mov.sel.delete(m.id)); render(); }
+async function bulk(acc){
+  const ids = new Set(UI.mov.sel); const ms = Store.data.movimientos.filter(m=>ids.has(m.id));
+  if(!ms.length) return;
+  if(acc==='borrar'){ if(!confirm(`¿Eliminar ${ms.length} movimientos?`)) return; await Store.delMany('movimientos', ms.map(m=>m.id)); UI.mov.sel.clear(); toast('Eliminados'); return; }
+  if(acc==='pagado' || acc==='pendiente'){ await Store.putMany('movimientos', ms.map(m=>({...m, estado:acc, fechaPago: acc==='pagado'? today(): null}))); UI.mov.sel.clear(); toast('Actualizado'); return; }
+  if(acc==='cuenta'){
+    const emps = new Set(ms.map(m=>m.empresaId));
+    if(emps.size>1){ alert('Selecciona movimientos de una sola empresa para asignar cuenta.'); return; }
+    const eid=[...emps][0];
+    modal(`<h3>Asignar cuenta a ${ms.length} movimientos</h3><select id="bkC" style="width:100%">${cuentasDe(eid).map(c=>`<option value="${c.id}">${esc(cuentaLabel(c))}</option>`).join('')}</select>
+      <div class="actions"><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn pri" id="bkOk">Asignar</button></div>`);
+    $('#bkOk').onclick = async()=>{ const c=$('#bkC').value; await Store.putMany('movimientos', ms.map(m=>({...m, cuentaId:c, cuentaManual:true}))); closeModal(); UI.mov.sel.clear(); toast('Cuenta asignada'); };
+    return;
+  }
+  if(acc==='fecha'){
+    modal(`<h3>Reprogramar ${ms.length} movimientos</h3><p class="small muted">Se conserva la fecha de vencimiento original; la nueva fecha es la que usa el flujo y no se pisa al reimportar.</p><input type="date" id="bkF" value="${today()}" style="width:100%">
+      <div class="actions"><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn" id="bkR">Volver a vencimiento original</button><button class="btn pri" id="bkOk">Reprogramar</button></div>`);
+    $('#bkOk').onclick = async()=>{ const f=$('#bkF').value; if(!f) return; await Store.putMany('movimientos', ms.map(m=>({...m, fechaProg:f}))); closeModal(); UI.mov.sel.clear(); toast('Reprogramado'); };
+    $('#bkR').onclick = async()=>{ await Store.putMany('movimientos', ms.map(m=>({...m, fechaProg:null}))); closeModal(); UI.mov.sel.clear(); toast('Fechas restauradas'); };
+  }
+}
+
+/* ---------- formulario de movimiento ---------- */
+function opcionesCuentas(eid, sel){ return `<option value="">(sin cuenta)</option>` + cuentasDe(eid).map(c=>`<option value="${c.id}" ${sel===c.id?'selected':''}>${esc(cuentaLabel(c))}</option>`).join(''); }
+function opcionesCat(tipo, sel){ const l=[...CATEGORIAS[tipo]]; if(sel && !l.includes(sel)) l.push(sel); return l.map(c=>`<option ${c===sel?'selected':''}>${esc(c)}</option>`).join(''); }
+function nuevoMov(){
+  if(!Store.data.empresas.length){ toast('Primero crea una empresa'); return; }
+  const eid = UI.emp!=='*'? UI.emp : E()[0].id;
+  const def = cuentasDe(eid).find(c=>c.porDefecto) || cuentasDe(eid)[0];
+  editMov(null, {empresaId:eid, cuentaId:def?.id||'', tipo:'egreso', categoria:'Cuota crédito bancario', fecha:today(), monto:'', origen:'manual', estado:'pendiente'});
+}
+function editMov(id, nuevo){
+  const m = nuevo || Store.data.movimientos.find(x=>x.id===id); if(!m) return;
+  const esNuevo = !!nuevo;
+  const imp = m.origen==='cxc' || m.origen==='cxp';
+  modal(`<h3>${esNuevo?'Nuevo movimiento':'Editar movimiento'} ${imp?`<span class="tag ${m.origen}">importado</span>`:''}</h3>
+  <div class="form" id="fm">
+    <label>Empresa<select id="mE" onchange="$('#mC').innerHTML=opcionesCuentas(this.value);">${E().map(e=>`<option value="${e.id}" ${m.empresaId===e.id?'selected':''}>${esc(e.nombre)}</option>`).join('')}</select></label>
+    <label>Cuenta<select id="mC">${opcionesCuentas(m.empresaId, m.cuentaId)}</select></label>
+    <label>Tipo<select id="mT" onchange="tipoMovChange()">${esNuevo?`<option value="traspaso">Traspaso entre cuentas / empresas</option>`:''}<option value="ingreso" ${m.tipo==='ingreso'?'selected':''}>Ingreso</option><option value="egreso" ${m.tipo==='egreso'?'selected':''}>Egreso</option></select></label>
+    <label id="lCat">Categoría<select id="mK">${opcionesCat(m.tipo, m.categoria)}</select></label>
+    <label id="lDest" class="hide">Cuenta destino<select id="mD">${Store.data.cuentas.filter(c=>c.id!==m.cuentaId).map(c=>`<option value="${c.id}">${esc(empresa(c.empresaId)?.nombre)} · ${esc(cuentaLabel(c))}</option>`).join('')}</select></label>
+    <label>${imp?'Fecha vencimiento':'Fecha'}<input type="date" id="mF" value="${m.fecha||''}"></label>
+    ${esNuevo?'':`<label>Fecha reprogramada (opcional)<input type="date" id="mFP" value="${m.fechaProg||''}"></label>`}
+    <label>Monto${esNuevo?' (por cuota)':''}<input type="number" id="mM" value="${m.monto??''}" step="1" inputmode="numeric"></label>
+    <label>Contraparte<input id="mP" value="${esc(m.contraparte||'')}" placeholder="Banco, proveedor, cliente…"></label>
+    ${imp?`<label>Documento<input disabled value="${esc([m.tipoDoc,m.folio].filter(Boolean).join(' '))} ${esc(m.rut||'')}"></label>`:''}
+    <label class="full">Glosa<input id="mG" value="${esc(m.glosa||'')}" placeholder="Ej: Crédito BCI N° 123, Leasing camión…"></label>
+    ${esNuevo?`<label>Repetir (N° cuotas)<input type="number" id="mN" value="1" min="1" max="360"></label>
+      <label>Frecuencia<select id="mR"><option value="m">Mensual</option><option value="s">Semanal</option><option value="q">Quincenal</option><option value="t">Trimestral</option><option value="a">Anual</option></select></label>`:
+      `<label>Estado<select id="mS"><option value="pendiente">Pendiente</option><option value="pagado" ${m.estado==='pagado'?'selected':''}>Pagado</option></select></label>`}
+  </div>
+  ${imp?'<p class="small muted">Al reimportar el Excel se actualizan monto y vencimiento; la fecha reprogramada y la cuenta asignada se mantienen.</p>':''}
+  <div class="actions">
+    ${!esNuevo?`<button class="btn dan" onclick="borrarMov('${m.id}')">Eliminar</button>${m.grupo?`<button class="btn dan" onclick="borrarGrupo('${m.grupo}')">Eliminar serie pendiente</button>`:''}`:''}
+    <span style="flex:1"></span>
+    <button class="btn" onclick="closeModal()">Cancelar</button><button class="btn pri" onclick="guardarMov(${esNuevo?'null':`'${m.id}'`})">Guardar</button>
+  </div>`);
+}
+function tipoMovChange(){
+  const t = $('#mT').value; const tr = t==='traspaso';
+  $('#lCat').classList.toggle('hide', tr); $('#lDest').classList.toggle('hide', !tr);
+  if(!tr) $('#mK').innerHTML = opcionesCat(t);
+}
+async function guardarMov(id){
+  const g = s => $(s)?.value;
+  const base = { empresaId:g('#mE'), cuentaId:g('#mC')||null, fecha:g('#mF'), monto:Math.round(+g('#mM')||0), contraparte:g('#mP').trim(), glosa:g('#mG').trim() };
+  if(!base.fecha || !base.monto){ toast('Fecha y monto son obligatorios'); return; }
+  if(id){
+    const m = Store.data.movimientos.find(x=>x.id===id);
+    const nm = {...m, ...base, tipo:g('#mT'), categoria:g('#mK'), fechaProg:g('#mFP')||null, estado:g('#mS')};
+    if(m.cuentaId!==nm.cuentaId) nm.cuentaManual = true;
+    if(nm.estado==='pagado' && m.estado!=='pagado') nm.fechaPago = today();
+    await Store.put('movimientos', nm); closeModal(); toast('Guardado'); return;
+  }
+  const n = Math.max(1, +g('#mN')||1), fr = g('#mR'); const grupo = n>1? uid(): null;
+  const fechaN = i => fr==='m'? addMonths(base.fecha,i) : fr==='t'? addMonths(base.fecha,3*i) : fr==='a'? addMonths(base.fecha,12*i) : addDays(base.fecha, (fr==='s'?7:14)*i);
+  const out = [];
+  if(g('#mT')==='traspaso'){
+    const dest = cuenta(g('#mD')); if(!dest || !base.cuentaId){ toast('Elige cuenta origen y destino'); return; }
+    if(dest.id===base.cuentaId){ toast('Origen y destino son la misma cuenta'); return; }
+    const cruzado = dest.empresaId!==base.empresaId; const cat = cruzado? 'Préstamo empresa relacionada':'Traspaso entre cuentas';
+    for(let i=0;i<n;i++){
+      const tg = uid(); const f = fechaN(i); const cu = n>1? `${i+1}/${n}`:null;
+      out.push({...base, id:uid(), fecha:f, tipo:'egreso', categoria:cat, origen:'manual', estado:'pendiente', grupo, traspaso:tg, cuota:cu, contraparte: base.contraparte || (empresa(dest.empresaId)?.nombre+' · '+cuentaLabel(dest))});
+      out.push({...base, id:uid(), fecha:f, empresaId:dest.empresaId, cuentaId:dest.id, tipo:'ingreso', categoria:cat, origen:'manual', estado:'pendiente', grupo, traspaso:tg, cuota:cu, contraparte: empresa(base.empresaId)?.nombre+' · '+cuentaLabel(cuenta(base.cuentaId))});
+    }
+  } else {
+    for(let i=0;i<n;i++) out.push({...base, id:uid(), fecha:fechaN(i), tipo:g('#mT'), categoria:g('#mK'), origen:'manual', estado:'pendiente', grupo, cuota: n>1? `${i+1}/${n}`:null});
+  }
+  await Store.putMany('movimientos', out); closeModal(); toast(`${out.length} movimiento(s) creados`);
+}
+async function borrarMov(id){
+  const m = Store.data.movimientos.find(x=>x.id===id);
+  const ids = m.traspaso? Store.data.movimientos.filter(x=>x.traspaso===m.traspaso).map(x=>x.id) : [id];
+  if(!confirm(ids.length>1? 'Se eliminará el traspaso completo (egreso e ingreso). ¿Continuar?' : '¿Eliminar este movimiento?')) return;
+  await Store.delMany('movimientos', ids); closeModal(); toast('Eliminado');
+}
+async function borrarGrupo(g){
+  const ids = Store.data.movimientos.filter(x=>x.grupo===g && x.estado!=='pagado').map(x=>x.id);
+  if(!confirm(`¿Eliminar las ${ids.length} cuotas pendientes de esta serie?`)) return;
+  await Store.delMany('movimientos', ids); closeModal(); toast('Serie eliminada');
+}
+
+/* =====================================================================
+   VISTA: IMPORTAR EXCEL
+   ===================================================================== */
+const CAMPOS = [
+  ['fecha','Fecha de vencimiento *',[/venc/,/fecha.*pago/,/fecha/]],
+  ['monto','Monto / saldo pendiente *',[/saldo/,/pendiente/,/monto/,/total/,/importe/]],
+  ['contraparte','Razón social / nombre',[/raz[oó]n/,/nombre/,/proveedor/,/cliente/,/auxiliar/]],
+  ['rut','RUT',[/rut/]],
+  ['tipoDoc','Tipo de documento',[/tipo/,/^doc/]],
+  ['folio','Folio / N° documento',[/folio/,/n[uú]m/,/n[°º]/,/^nro/,/documento/]],
+  ['emision','Fecha de emisión',[/emisi/]],
+  ['cuenta','Cuenta bancaria (opcional)',[/cuenta.*(cte|corr|banc)/,/banco/]],
+  ['glosa','Glosa (opcional)',[/glosa/,/detalle/,/descrip/,/observ/]],
+];
+function viewImp(){
+  const st = UI.imp;
+  const emps = E();
+  return `<div class="grid2">
+  <div class="card"><h2>1 · Archivo</h2>
+    <div class="form">
+      <label>Empresa<select id="iE" onchange="impSet('emp',this.value)">${emps.map(e=>`<option value="${e.id}" ${(st?.emp|| (UI.emp!=='*'?UI.emp:emps[0]?.id))===e.id?'selected':''}>${esc(e.nombre)}</option>`).join('')}</select></label>
+      <label>Tipo de documentos<select id="iO" onchange="impSet('origen',this.value)"><option value="cxp" ${st?.origen==='cxp'?'selected':''}>Por pagar (proveedores)</option><option value="cxc" ${st?.origen==='cxc'?'selected':''}>Por cobrar (clientes)</option></select></label>
+      <label class="full">Archivo Excel (.xlsx, .xls, .csv)<input type="file" accept=".xlsx,.xls,.xlsm,.csv" onchange="impFile(this.files[0])"></label>
+    </div>
+    <p class="small muted">Sirve el reporte de documentos pendientes de Laudus u otro ERP, o la plantilla incluida (plantilla_documentos.xlsx). Si el archivo trae varias empresas, impórtalo filtrado por empresa.</p>
+  </div>
+  ${st?.rows ? viewImpMap() : '<div class="card muted">Selecciona un archivo para mapear columnas.</div>'}
+  </div>
+  ${st?.prev ? viewImpPrev() : ''}`;
+}
+function impSet(k,v){ UI.imp = UI.imp || {}; UI.imp[k]=v; if(UI.imp.rows) impPreview(); else render(); }
+async function impFile(file){
+  if(!file) return;
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, {type:'array', cellDates:false});
+  UI.imp = { emp: $('#iE').value, origen: $('#iO').value, wb, file:file.name, sheet: wb.SheetNames[0] };
+  impLoadSheet();
+}
+function impLoadSheet(){
+  const st = UI.imp; const ws = st.wb.Sheets[st.sheet];
+  const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:''});
+  let h = 0; for(let i=0;i<Math.min(rows.length,30);i++){ const tx = rows[i].filter(v=>typeof v==='string' && v.trim() && isNaN(parseMonto(v)??NaN)).length; if(tx>=3){ h=i; break; } }
+  st.rows = rows; st.head = h; impAutoMap(); impPreview();
+}
+function impAutoMap(){
+  const st = UI.imp; const hdr = (st.rows[st.head]||[]).map(v=>String(v).toLowerCase().trim());
+  const saved = ls.get('fc_map_'+st.origen, null);
+  st.map = {};
+  CAMPOS.forEach(([k,,pats])=>{
+    if(saved && saved[k] && hdr.includes(saved[k])){ st.map[k] = hdr.indexOf(saved[k]); return; }
+    for(const p of pats){ const i = hdr.findIndex((h,ix)=>p.test(h) && !Object.values(st.map).includes(ix)); if(i>=0){ st.map[k]=i; break; } }
+  });
+}
+function viewImpMap(){
+  const st = UI.imp; const hdr = st.rows[st.head]||[];
+  return `<div class="card"><h2>2 · Columnas</h2>
+    <div class="form">
+      <label>Hoja<select onchange="UI.imp.sheet=this.value;impLoadSheet()">${st.wb.SheetNames.map(s=>`<option ${s===st.sheet?'selected':''}>${esc(s)}</option>`).join('')}</select></label>
+      <label>Fila de encabezados<input type="number" min="1" value="${st.head+1}" onchange="UI.imp.head=Math.max(0,this.value-1);impAutoMap();impPreview()"></label>
+      ${CAMPOS.map(([k,l])=>`<label>${l}<select onchange="UI.imp.map['${k}']=this.value===''?undefined:+this.value;impPreview()"><option value="">(no usar)</option>${hdr.map((h,i)=>`<option value="${i}" ${st.map[k]===i?'selected':''}>${esc(h||'Col '+(i+1))}</option>`).join('')}</select></label>`).join('')}
+    </div></div>`;
+}
+function impPreview(){
+  const st = UI.imp; const m = st.map; const emp = st.emp || $('#iE')?.value; st.emp = emp;
+  const tipo = st.origen==='cxc'? 'ingreso':'egreso';
+  const ctas = cuentasDe(emp); const def = ctas.find(c=>c.porDefecto) || ctas[0];
+  const matchCta = v => { const s = String(v||'').toLowerCase().replace(/[^a-z0-9]/g,''); if(!s) return null; return ctas.find(c => { const n=String(c.numero||'').replace(/[^0-9]/g,''); return (n && s.includes(n)) || (c.alias && s===c.alias.toLowerCase().replace(/[^a-z0-9]/g,'')); }); };
+  const docs = [], errs = []; const seen = new Map();
+  st.rows.slice(st.head+1).forEach((r,ix) => {
+    if(!r.some(v=>v!=='' && v!=null)) return;
+    const get = k => m[k]==null? '' : r[m[k]];
+    const monto = parseMonto(get('monto')); const fecha = parseFecha(get('fecha'));
+    const contraparte = String(get('contraparte')||'').trim();
+    if(monto==null || fecha==null){
+      if(ix<3 && !contraparte) return; // filas de subtítulos
+      if(/total/i.test(r.join(' '))) return;
+      errs.push(`Fila ${st.head+ix+2}: ${monto==null?'monto':'fecha'} no válido`); return;
+    }
+    if(monto===0) return;
+    const rut = String(get('rut')||'').trim(), tipoDoc = String(get('tipoDoc')||'').trim(), folio = String(get('folio')||'').trim();
+    let clave = [emp, st.origen, normRut(rut), tipoDoc.toUpperCase(), folio].join('|');
+    if(!folio) clave = [emp, st.origen, normRut(rut)||contraparte.toUpperCase(), fecha, monto].join('|');
+    const n = (seen.get(clave)||0)+1; seen.set(clave,n); if(n>1) clave += '|'+n;
+    const cta = m.cuenta!=null ? matchCta(get('cuenta')) : null;
+    docs.push({ id:'d_'+hashId(clave), clave, empresaId:emp, origen:st.origen, tipo, categoria: st.origen==='cxc'?CAT_CXC:CAT_CXP,
+      fecha, monto: Math.abs(monto) * (monto<0?-1:1), contraparte, rut, tipoDoc, folio, emision: parseFecha(get('emision')), glosa:String(get('glosa')||'').trim(),
+      _cta: cta?.id || def?.id || null, _ctaExcel: !!cta });
+  });
+  const existentes = Store.data.movimientos.filter(x=>x.empresaId===emp && x.origen===st.origen);
+  const exMap = new Map(existentes.map(x=>[x.id,x]));
+  const ids = new Set(docs.map(d=>d.id));
+  const nuevos = docs.filter(d=>!exMap.has(d.id));
+  const act = docs.filter(d=>exMap.has(d.id));
+  const cambian = act.filter(d=>{ const x=exMap.get(d.id); return x.monto!==d.monto || x.fecha!==d.fecha || x.estado==='pagado'; });
+  const cerrar = existentes.filter(x=>x.estado!=='pagado' && !ids.has(x.id));
+  st.prev = {docs, errs, nuevos, act, cambian, cerrar, total: docs.reduce((s,d)=>s+d.monto,0), cerrarOk: st.prev?.cerrarOk ?? true};
+  render();
+}
+function viewImpPrev(){
+  const p = UI.imp.prev; const e = empresa(UI.imp.emp);
+  return `<div class="card"><h2>3 · Revisión · ${esc(e?.nombre||'')} · ${UI.imp.origen==='cxc'?'Por cobrar':'Por pagar'}</h2>
+    <div class="kpis">
+      <div class="kpi"><div class="l">Documentos leídos</div><div class="v">${p.docs.length}</div><div class="s">Total ${fmt(p.total)}</div></div>
+      <div class="kpi"><div class="l">Nuevos</div><div class="v pos">${p.nuevos.length}</div></div>
+      <div class="kpi"><div class="l">Ya existentes</div><div class="v">${p.act.length}</div><div class="s">${p.cambian.length} con cambios</div></div>
+      <div class="kpi"><div class="l">Ya no aparecen</div><div class="v ${p.cerrar.length?'neg':''}">${p.cerrar.length}</div><div class="s">${fmt(p.cerrar.reduce((s,x)=>s+x.monto,0))}</div></div>
+    </div>
+    <label class="small" style="display:flex;gap:6px;align-items:center;margin-bottom:8px"><input type="checkbox" ${p.cerrarOk?'checked':''} onchange="UI.imp.prev.cerrarOk=this.checked"> El archivo es la cartera completa de pendientes: marcar como <b>pagados</b> los ${p.cerrar.length} documentos que ya no aparecen.</label>
+    ${!cuentasDe(UI.imp.emp).length?'<p class="banner">Esta empresa no tiene cuentas bancarias: los documentos quedarán sin cuenta asignada (igual suman en el flujo de la empresa).</p>':''}
+    ${p.errs.length?`<details><summary class="neg small">${p.errs.length} filas con problemas (se omiten)</summary><div class="small muted">${p.errs.slice(0,50).map(esc).join('<br>')}</div></details>`:''}
+    <div class="tw" style="max-height:300px;margin:10px 0"><table><thead><tr><th>Vencimiento</th><th>Contraparte</th><th>RUT</th><th>Documento</th><th class="n">Monto</th><th>Estado</th></tr></thead><tbody>
+    ${p.docs.slice(0,200).map(d=>`<tr><td>${fDate(d.fecha)}</td><td>${esc(d.contraparte)}</td><td>${esc(d.rut)}</td><td>${esc(d.tipoDoc)} ${esc(d.folio)}</td><td class="n">${fmt(d.monto)}</td><td>${p.nuevos.includes(d)?'<span class="tag cxc">nuevo</span>':p.cambian.includes(d)?'<span class="tag man">cambia</span>':'<span class="tag">igual</span>'}</td></tr>`).join('')}
+    </tbody></table></div>
+    ${p.docs.length>200?`<p class="small muted">Vista previa de 200 de ${p.docs.length}.</p>`:''}
+    <div class="actions"><button class="btn" onclick="UI.imp=null;render()">Cancelar</button><button class="btn pri" onclick="impConfirmar()" ${p.docs.length||p.cerrar.length?'':'disabled'}>Importar</button></div>
+  </div>`;
+}
+async function impConfirmar(){
+  const st = UI.imp, p = st.prev;
+  const exMap = new Map(Store.data.movimientos.map(x=>[x.id,x]));
+  const lote = today()+' '+st.file;
+  const out = p.docs.map(d => {
+    const {_cta,_ctaExcel,...doc} = d; const x = exMap.get(d.id);
+    if(x){
+      const cuentaId = x.cuentaManual ? x.cuentaId : (_ctaExcel ? _cta : (x.cuentaId || _cta));
+      return {...x, ...doc, cuentaId, fechaProg: x.fechaProg||null, estado:'pendiente', fechaPago:null, lote};
+    }
+    return {...doc, cuentaId:_cta, estado:'pendiente', lote, creado: today()};
+  });
+  if(p.cerrarOk) p.cerrar.forEach(x => out.push({...x, estado:'pagado', fechaPago: today(), cerradoPorImport: lote}));
+  const hdr = st.rows[st.head]||[]; const mapSave = {}; Object.entries(st.map).forEach(([k,i])=>{ if(i!=null) mapSave[k]=String(hdr[i]).toLowerCase().trim(); });
+  ls.set('fc_map_'+st.origen, mapSave);
+  $('#app').style.opacity=.5;
+  try{ await Store.putMany('movimientos', out); toast(`Importación lista: ${p.nuevos.length} nuevos, ${p.act.length} actualizados${p.cerrarOk&&p.cerrar.length?`, ${p.cerrar.length} cerrados`:''}`, 4000); UI.imp=null; }
+  catch(e){ alert('Error al importar: '+e.message); }
+  $('#app').style.opacity=1; render();
+}
+
+/* =====================================================================
+   VISTA: EMPRESAS Y CUENTAS
+   ===================================================================== */
+function viewCtas(){
+  const emps = UI.emp==='*'? E() : [empresa(UI.emp)];
+  return `<div class="row" style="margin-bottom:12px"><button class="btn pri" onclick="editEmpresa()">+ Empresa</button><span class="small muted">Actualiza los saldos con la cartola del día. El flujo parte desde estos saldos.</span></div>
+  ${emps.map(e => { const cs = cuentasDe(e.id); const tot = cs.reduce((s,c)=>s+(+c.saldo||0),0);
+    return `<div class="card"><div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px">
+      <h2 style="margin:0"><span class="dot" style="background:${esc(e.color||'#888')}"></span>${esc(e.nombre)} <span class="small muted">${esc(e.rut||'')}</span></h2>
+      <div class="row"><button class="btn sm" onclick="editEmpresa('${e.id}')">Editar empresa</button><button class="btn sm" onclick="editCuenta(null,'${e.id}')">+ Cuenta</button></div></div>
+      <div class="tw"><table class="cards"><thead><tr><th>Cuenta</th><th>Banco</th><th>N°</th><th class="n">Línea de crédito</th><th class="n">Saldo</th><th>Fecha saldo</th><th></th></tr></thead><tbody>
+      ${cs.map(c=>`<tr><td data-l="Cuenta">${esc(c.alias||'')} ${c.porDefecto?'<span class="tag">por defecto</span>':''}</td><td data-l="Banco">${esc(c.banco||'')}</td><td data-l="N°">${esc(c.numero||'')}</td><td class="n" data-l="Línea">${c.cupoLinea?fmt(c.cupoLinea):'-'}</td>
+        <td class="n" data-l="Saldo"><input type="number" value="${+c.saldo||0}" style="width:150px;text-align:right" onchange="saldoRapido('${c.id}',this.value)"></td>
+        <td data-l="Fecha saldo" class="${c.fechaSaldo && c.fechaSaldo<today()?'muted':''}">${fDate(c.fechaSaldo)}</td>
+        <td><button class="btn sm" onclick="editCuenta('${c.id}')">Editar</button></td></tr>`).join('') || '<tr><td colspan="7" class="muted">Sin cuentas</td></tr>'}
+      </tbody>${cs.length?`<tfoot><tr><td colspan="4"><b>Total</b></td><td class="n"><b>${fmt(tot)}</b></td><td colspan="2"></td></tr></tfoot>`:''}</table></div></div>`; }).join('')}`;
+}
+async function saldoRapido(id, v){ const c = cuenta(id); await Store.put('cuentas', {...c, saldo:Math.round(+v||0), fechaSaldo: today()}); toast('Saldo actualizado'); }
+const COLORES = ['#2e7355','#2f5d8a','#b7791f','#8a3b8f','#b3402f','#3b8f8a','#6b6b2e','#555'];
+function editEmpresa(id){
+  const e = id? empresa(id) : {nombre:'', rut:'', color:COLORES[Store.data.empresas.length % COLORES.length], orden:Store.data.empresas.length};
+  modal(`<h3>${id?'Editar':'Nueva'} empresa</h3><div class="form">
+    <label class="full">Nombre<input id="eN" value="${esc(e.nombre)}"></label>
+    <label>RUT<input id="eR" value="${esc(e.rut||'')}"></label>
+    <label>Color<input id="eC" type="color" value="${esc(e.color)}"></label>
+    <label>Orden<input id="eO" type="number" value="${e.orden??0}"></label></div>
+    <div class="actions">${id?`<button class="btn dan" onclick="borrarEmpresa('${id}')">Eliminar</button>`:''}<span style="flex:1"></span><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn pri" onclick="guardarEmpresa(${id?`'${id}'`:'null'})">Guardar</button></div>`);
+}
+async function guardarEmpresa(id){
+  const nombre = $('#eN').value.trim(); if(!nombre){ toast('Nombre obligatorio'); return; }
+  const o = {...(id?empresa(id):{}), nombre, rut:$('#eR').value.trim(), color:$('#eC').value, orden:+$('#eO').value||0};
+  if(!id) o.id = uid();
+  await Store.put('empresas', o); closeModal(); toast('Empresa guardada');
+  if(!id && !cuentasDe(o.id).length) setTimeout(()=>editCuenta(null,o.id),150);
+}
+async function borrarEmpresa(id){
+  const nm = Store.data.movimientos.filter(m=>m.empresaId===id).length, nc = cuentasDe(id).length;
+  if(!confirm(`Se eliminará la empresa con ${nc} cuentas y ${nm} movimientos. ¿Continuar?`)) return;
+  await Store.delMany('movimientos', Store.data.movimientos.filter(m=>m.empresaId===id).map(m=>m.id));
+  await Store.delMany('cuentas', cuentasDe(id).map(c=>c.id)); await Store.del('empresas', id);
+  if(UI.emp===id) UI.emp='*'; closeModal(); toast('Empresa eliminada');
+}
+function editCuenta(id, eid){
+  const c = id? cuenta(id) : {empresaId:eid, banco:'', numero:'', alias:'', saldo:0, fechaSaldo:today(), cupoLinea:0, porDefecto: !cuentasDe(eid).length};
+  modal(`<h3>${id?'Editar':'Nueva'} cuenta · ${esc(empresa(c.empresaId)?.nombre)}</h3><div class="form">
+    <label>Banco<input id="cB" value="${esc(c.banco)}" list="bancos"></label>
+    <datalist id="bancos">${['Banco de Chile','BancoEstado','Santander','BCI','Scotiabank','Itaú','Security','BICE','Internacional','Falabella','Consorcio'].map(b=>`<option>${b}</option>`).join('')}</datalist>
+    <label>N° de cuenta<input id="cN" value="${esc(c.numero)}"></label>
+    <label>Alias<input id="cA" value="${esc(c.alias)}" placeholder="Ej: BCI principal"></label>
+    <label>Línea de crédito (cupo)<input id="cL" type="number" value="${+c.cupoLinea||0}"></label>
+    <label>Saldo actual<input id="cS" type="number" value="${+c.saldo||0}"></label>
+    <label>Fecha del saldo<input id="cF" type="date" value="${c.fechaSaldo||today()}"></label>
+    <label class="full" style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="cD" ${c.porDefecto?'checked':''}> Cuenta por defecto (recibe los documentos importados)</label></div>
+    <div class="actions">${id?`<button class="btn dan" onclick="borrarCuenta('${id}')">Eliminar</button>`:''}<span style="flex:1"></span><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn pri" onclick="guardarCuenta(${id?`'${id}'`:'null'},'${c.empresaId}')">Guardar</button></div>`);
+}
+async function guardarCuenta(id, eid){
+  const o = {...(id?cuenta(id):{id:uid(), empresaId:eid}), banco:$('#cB').value.trim(), numero:$('#cN').value.trim(), alias:$('#cA').value.trim(), cupoLinea:Math.round(+$('#cL').value||0), saldo:Math.round(+$('#cS').value||0), fechaSaldo:$('#cF').value, porDefecto:$('#cD').checked};
+  if(!o.banco && !o.alias){ toast('Indica banco o alias'); return; }
+  const upd = [o];
+  if(o.porDefecto) cuentasDe(eid).filter(c=>c.id!==o.id && c.porDefecto).forEach(c=>upd.push({...c, porDefecto:false}));
+  await Store.putMany('cuentas', upd);
+  // asignar documentos sin cuenta a la cuenta por defecto
+  if(o.porDefecto){ const sin = Store.data.movimientos.filter(m=>m.empresaId===eid && !m.cuentaId); if(sin.length) await Store.putMany('movimientos', sin.map(m=>({...m, cuentaId:o.id}))); }
+  closeModal(); toast('Cuenta guardada');
+}
+async function borrarCuenta(id){
+  const n = Store.data.movimientos.filter(m=>m.cuentaId===id).length;
+  if(!confirm(`¿Eliminar la cuenta? ${n} movimientos quedarán sin cuenta asignada.`)) return;
+  await Store.putMany('movimientos', Store.data.movimientos.filter(m=>m.cuentaId===id).map(m=>({...m, cuentaId:null})));
+  await Store.del('cuentas', id); closeModal(); toast('Cuenta eliminada');
+}
+
+/* =====================================================================
+   VISTA: AJUSTES
+   ===================================================================== */
+function viewAjustes(){
+  const nPag = Store.data.movimientos.filter(m=>m.estado==='pagado').length;
+  return `<div class="grid2">
+  <div class="card"><h2>Conexión</h2>
+    ${Store.mode==='firebase'?`<p>Firebase · proyecto <b>${esc(window.FLUXCAJA_FIREBASE.projectId)}</b><br>Usuario: <b>${esc(Store.user?.email)}</b></p><button class="btn" onclick="firebase.auth().signOut()">Cerrar sesión</button>`
+      :`<p>Modo local (sin sincronización). Para sincronizar entre equipos, completa <b>config.js</b> con la configuración de tu proyecto Firebase y vuelve a publicar.</p>`}
+    <p class="small muted">${Store.data.empresas.length} empresas · ${Store.data.cuentas.length} cuentas · ${Store.data.movimientos.length} movimientos</p>
+  </div>
+  <div class="card"><h2>Respaldo</h2>
+    <p class="small muted">Descarga todos los datos en JSON o restáuralos (útil para migrar de modo local a Firebase).</p>
+    <div class="row"><button class="btn" onclick="exportJSON()">Descargar respaldo</button>
+    <label class="btn">Restaurar respaldo<input type="file" accept=".json" class="hide" onchange="importJSON(this.files[0])"></label></div>
+  </div>
+  <div class="card"><h2>Limpieza</h2>
+    <p class="small muted">${nPag} movimientos pagados guardados como historial.</p>
+    <div class="row"><label>Eliminar pagados con fecha anterior a<input type="date" id="lmF" value="${addMonths(today(),-6)}"></label><button class="btn dan" onclick="limpiar()">Eliminar</button></div>
+  </div>
+  ${Store.mode==='local'?`<div class="card"><h2>Datos de ejemplo</h2><div class="row"><button class="btn" onclick="cargarDemo()">Cargar ejemplo</button><button class="btn dan" onclick="if(confirm('¿Borrar todos los datos locales?')){COLS.forEach(c=>Store.data[c]=[]);Store.saveLocal();render();}">Borrar todo</button></div></div>`:''}
+  <div class="card"><h2>Instalar</h2><p class="small">En PC (Chrome/Edge): icono de instalar en la barra de direcciones. En Android: menú ⋮ › Instalar app. En iPhone (Safari): Compartir › Agregar a pantalla de inicio.</p>
+  ${window._bip?'<button class="btn pri" onclick="_bip.prompt()">Instalar FluxCaja</button>':''}</div>
+  </div>`;
+}
+function exportJSON(){
+  const blob = new Blob([JSON.stringify({app:'fluxcaja', v:1, fecha:today(), data:Store.data},null,1)], {type:'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `fluxcaja_respaldo_${today()}.json`; a.click();
+}
+async function importJSON(file){
+  if(!file) return; try{
+    const j = JSON.parse(await file.text()); if(j.app!=='fluxcaja') throw new Error('Archivo no válido');
+    if(!confirm('Se agregarán/reemplazarán los registros del respaldo. ¿Continuar?')) return;
+    for(const c of COLS) await Store.putMany(c, (j.data[c]||[]).map(o=>({...o})));
+    toast('Respaldo restaurado');
+  }catch(e){ alert('Error: '+e.message); }
+}
+async function limpiar(){
+  const f = $('#lmF').value; const ids = Store.data.movimientos.filter(m=>m.estado==='pagado' && fEf(m)<f).map(m=>m.id);
+  if(!ids.length){ toast('Nada que eliminar'); return; }
+  if(!confirm(`¿Eliminar ${ids.length} movimientos pagados?`)) return; await Store.delMany('movimientos', ids); toast('Listo');
+}
+async function cargarDemo(){
+  const t = today(); const e1={id:uid(),nombre:'Agrícola Demo',rut:'76.111.111-1',color:'#2e7355',orden:0}, e2={id:uid(),nombre:'Transportes Demo',rut:'76.222.222-2',color:'#2f5d8a',orden:1};
+  const c1={id:uid(),empresaId:e1.id,banco:'BCI',numero:'12345678',alias:'BCI principal',saldo:45000000,fechaSaldo:t,porDefecto:true,cupoLinea:20000000};
+  const c2={id:uid(),empresaId:e1.id,banco:'Santander',numero:'987654',alias:'Santander',saldo:8000000,fechaSaldo:t,porDefecto:false};
+  const c3={id:uid(),empresaId:e2.id,banco:'Banco de Chile',numero:'555111',alias:'Chile',saldo:12000000,fechaSaldo:t,porDefecto:true};
+  const mv=[]; const prov=['Agroquímicos Sur','Combustibles Araucanía','Maderas del Sur','Repuestos Angol','Fertilizantes SpA']; const cli=['Exportadora Frutas','Aserradero Norte','Frigorífico Sur'];
+  for(let i=0;i<40;i++){ const e=i%3?e1:e2; mv.push({id:uid(),empresaId:e.id,cuentaId:e===e1?c1.id:c3.id,origen:'cxp',tipo:'egreso',categoria:CAT_CXP,fecha:addDays(t,-10+i*3),monto:Math.round(800000+Math.random()*6e6),contraparte:prov[i%5],rut:'77.'+(100+i)+'.000-'+(i%9),tipoDoc:'FAC',folio:String(1000+i),estado:'pendiente'}); }
+  for(let i=0;i<18;i++){ mv.push({id:uid(),empresaId:e1.id,cuentaId:c1.id,origen:'cxc',tipo:'ingreso',categoria:CAT_CXC,fecha:addDays(t,-5+i*6),monto:Math.round(3e6+Math.random()*12e6),contraparte:cli[i%3],rut:'96.'+(500+i)+'.000-1',tipoDoc:'FAC',folio:String(5000+i),estado:'pendiente'}); }
+  const g=uid(); for(let i=0;i<24;i++) mv.push({id:uid(),empresaId:e1.id,cuentaId:c1.id,origen:'manual',tipo:'egreso',categoria:'Cuota crédito bancario',fecha:addMonths(addDays(t,5),i),monto:2350000,contraparte:'BCI',glosa:'Crédito comercial',estado:'pendiente',grupo:g,cuota:`${i+1}/24`});
+  const g2=uid(); for(let i=0;i<12;i++) mv.push({id:uid(),empresaId:e2.id,cuentaId:c3.id,origen:'manual',tipo:'egreso',categoria:'Leasing',fecha:addMonths(addDays(t,10),i),monto:1850000,contraparte:'BCI Leasing',glosa:'Leasing camión',estado:'pendiente',grupo:g2,cuota:`${i+1}/12`});
+  for(let i=0;i<4;i++) mv.push({id:uid(),empresaId:e1.id,cuentaId:c1.id,origen:'manual',tipo:'egreso',categoria:'Remuneraciones',fecha:addMonths(t.slice(0,8)+'28',i),monto:18500000,contraparte:'Personal',estado:'pendiente'});
+  await Store.putMany('empresas',[e1,e2]); await Store.putMany('cuentas',[c1,c2,c3]); await Store.putMany('movimientos',mv); toast('Datos de ejemplo cargados');
+}
+
+/* ---------- modal ---------- */
+function modal(html, wide){ closeModal(); const d=document.createElement('div'); d.className='modal-bg'; d.id='mdl'; d.innerHTML=`<div class="modal ${wide?'wide':''}">${html}</div>`; d.addEventListener('mousedown',e=>{ if(e.target===d) closeModal(); }); document.body.appendChild(d); }
+function closeModal(){ $('#mdl')?.remove(); }
+addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
+
+/* ---------- PWA ---------- */
+addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); window._bip=e; });
+if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(()=>{});
+
+/* ---------- arranque ---------- */
+(async()=>{
+  if(typeof XLSX==='undefined') console.warn('SheetJS no cargó (sin conexión la primera vez).');
+  if(Store.hasFirebase){ try{ await Store.initFirebase(); return; }catch(e){ console.error(e); alert('No se pudo iniciar Firebase: '+e.message+'\nSe usará modo local.'); } }
+  Store.initLocal(); render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Colecciones de FluxCaja (prefijo fc_). Solo usuarios autenticados.
+    // Para restringir a correos específicos, reemplaza la condición por:
+    //   request.auth != null && request.auth.token.email in ['tu@correo.cl', 'otro@correo.cl']
+    match /{col}/{doc} {
+      allow read, write: if col.matches('fc_.*') && request.auth != null;
+    }
+  }
+}
