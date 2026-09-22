@@ -1,13 +1,13 @@
 {
-  "name": "FluxCaja · Flujo de caja",
-  "short_name": "FluxCaja",
+  "name": "Flujo de Caja Consolidado",
+  "short_name": "Flujo Consolidado",
   "description": "Flujo de caja multiempresa y multicuenta",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#f4f6f3",
-  "theme_color": "#1f4d3a",
+  "background_color": "#eceff1",
+  "theme_color": "#37474f",
   "lang": "es-CL",
   "icons": [
     {"src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png"},

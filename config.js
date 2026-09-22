@@ -1,4 +1,4 @@
-/* FluxCaja · Configuración de Firebase (proyecto flujocajaapp) */
+/* Flujo de Caja Consolidado · Configuración de Firebase (proyecto flujocajaapp) */
 window.FLUXCAJA_FIREBASE = {
   apiKey: "AIzaSyDPZUDvvExYMnaV4KyfCHhNxphSxCr3t4A",
   authDomain: "flujocajaapp.firebaseapp.com",

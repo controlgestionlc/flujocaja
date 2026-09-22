@@ -1,4 +1,4 @@
-# FluxCaja · Flujo de caja multiempresa
+# Flujo de Caja Consolidado
 
 App web instalable (PWA) para PC y celular. Se aloja en GitHub Pages y guarda los datos en Firebase Firestore.
 
@@ -41,12 +41,17 @@ App web instalable (PWA) para PC y celular. Se aloja en GitHub Pages y guarda lo
    - Cada documento se identifica por empresa + RUT + tipo + folio, así que reimportar **actualiza** y no duplica.
    - Los que ya no vienen en el archivo se pueden marcar como pagados automáticamente (casilla activa por defecto).
    - Si el Excel trae una columna de cuenta bancaria (N° o alias), se asigna esa cuenta; si no, la cuenta por defecto.
-3. **Movimientos manuales:** créditos, leasing, remuneraciones, impuestos, etc. Con *Repetir N cuotas* se genera la serie completa (mensual, semanal, quincenal, trimestral o anual). *Traspaso* crea el egreso y el ingreso en ambas cuentas; si son empresas distintas queda como préstamo entre relacionadas y se compensa en el consolidado.
-4. **Flujo:** vista diaria, semanal o mensual por empresa, por cuenta o del holding completo. La columna *Vencido* reúne lo pendiente con fecha pasada. Clic en una celda muestra el detalle. Se exporta a Excel.
-5. **Reprogramar:** en Movimientos, selecciona documentos › *Reprogramar fecha*. La fecha original se conserva y la reprogramación no se pierde al reimportar.
+3. **Clientes y proveedores (auxiliar):** en *Empresas y cuentas › Clientes y proveedores*. Se llena solo al importar documentos, con *Generar desde documentos*, importando un Excel con RUT y nombre, o creando registros a mano (el RUT se valida con dígito verificador).
+4. **Movimientos manuales:** al elegir *Cobranza clientes* o *Pago proveedores* la app exige el cliente o proveedor (buscador dinámico por RUT o nombre, con opción de crearlo ahí mismo) y el N° de documento. Si después ese documento llega en el Excel, el importado reemplaza al manual y conserva su cuenta y fecha reprogramada.
+5. **Otros movimientos manuales:** créditos, leasing, remuneraciones, impuestos, etc. Con *Repetir N cuotas* se genera la serie completa (mensual, semanal, quincenal, trimestral o anual). *Traspaso* crea el egreso y el ingreso en ambas cuentas; si son empresas distintas queda como préstamo entre relacionadas y se compensa en el consolidado.
+6. **Flujo:** vista diaria, semanal o mensual por empresa, por cuenta o del holding completo. La columna *Vencido* reúne lo pendiente con fecha pasada. Clic en una celda muestra el detalle. Se exporta a Excel.
+7. **Reprogramar:** en Movimientos, selecciona documentos › *Reprogramar fecha*. La fecha original se conserva y la reprogramación no se pierde al reimportar.
 
 ### Rutina sugerida
 Actualizar saldos bancarios › importar CxP y CxC del ERP › marcar pagados los manuales que ya salieron › revisar el flujo.
 
-## Actualizar la app
-Tras cambiar `index.html`, sube la versión en `sw.js` (`fluxcaja-v1` → `fluxcaja-v2`) para que los equipos instalados tomen la nueva versión.
+## Versiones
+La versión se ve junto al nombre en la barra superior y en Ajustes (con el historial de cambios).
+Al publicar una versión nueva se actualizan juntos `APP_VERSION` en `index.html` y `VERSION` en `sw.js` (ej. `1.2.0` / `fcc-1.2.0`); así los equipos instalados descargan el cambio. En Ajustes › *Buscar actualización* se fuerza la recarga.
+
+Versión actual: **1.3.0**

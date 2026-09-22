@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>FluxCaja</title>
+<title>Flujo de Caja Consolidado</title>
 <meta name="description" content="Flujo de caja multiempresa y multicuenta">
-<meta name="theme-color" content="#1f4d3a">
+<meta name="theme-color" content="#37474f">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -18,15 +18,17 @@
 <script src="config.js"></script>
 <style>
 :root{
-  --bg:#f4f6f3;--card:#fff;--ink:#1c2420;--muted:#66706a;--line:#dfe5e0;
-  --brand:#1f4d3a;--brand2:#2e7355;--in:#1f7a4d;--out:#b3402f;--warn:#b7791f;
-  --soft:#eef3ef;--radius:10px;--shadow:0 1px 3px rgba(0,0,0,.08);
+  --bg:#eceff1;--card:#fff;--ink:#263238;--muted:#607d8b;--line:#cfd8dc;
+  --brand:#37474f;--brand2:#546e7a;--in:#2e7d32;--out:#c62828;--warn:#b7791f;
+  --soft:#eef2f4;--accent:#78909c;--chart:#546e7a;--chart0:#b0bec5;
+  --row-saldo:#e8edf0;--hover:#dde5ea;--radius:10px;--shadow:0 1px 3px rgba(0,0,0,.08);
 }
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 button,input,select,textarea{font:inherit;color:inherit}
 header.top{position:sticky;top:0;z-index:20;background:var(--brand);color:#fff;padding:10px 16px;padding-top:calc(10px + env(safe-area-inset-top));display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-header.top h1{font-size:18px;margin:0;font-weight:700;letter-spacing:.3px}
+header.top h1{font-size:18px;margin:0;font-weight:700;letter-spacing:.3px;white-space:nowrap}
+header.top .ver{font-size:11px;font-weight:500;opacity:.7;margin-left:4px;letter-spacing:0}
 header.top .sp{flex:1}
 header.top select{background:#fff2;color:#fff;border:1px solid #fff5;border-radius:8px;padding:6px 8px;max-width:220px}
 header.top select option{color:#000}
@@ -43,6 +45,7 @@ input,select,textarea{border:1px solid var(--line);border-radius:8px;padding:7px
 input:focus,select:focus,textarea:focus{outline:2px solid var(--brand2);outline-offset:-1px}
 .btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:7px 12px;cursor:pointer;white-space:nowrap}
 .btn:hover{background:var(--soft)}
+.row>label.btn{display:inline-flex;flex-direction:row;align-items:center;font-size:14px;color:var(--ink)}
 .btn.pri{background:var(--brand);border-color:var(--brand);color:#fff}
 .btn.pri:hover{background:var(--brand2)}
 .btn.dan{color:var(--out);border-color:#e8c3bd}
@@ -60,14 +63,14 @@ th{background:var(--soft);font-weight:600;font-size:12px;position:sticky;top:0;z
 td.n,th.n{text-align:right}
 table.flujo td:first-child,table.flujo th:first-child{position:sticky;left:0;background:#fff;z-index:2;min-width:190px}
 table.flujo th:first-child{background:var(--soft);z-index:3}
-table.flujo tr.sec td{background:#f7f9f7;font-weight:700;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+table.flujo tr.sec td{background:#f5f7f8;font-weight:700;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
 table.flujo tr.tot td{font-weight:700;border-top:2px solid var(--line)}
-table.flujo tr.saldo td{font-weight:700;background:#f2f7f3}
-table.flujo tr.saldo td:first-child{background:#f2f7f3}
+table.flujo tr.saldo td{font-weight:700;background:var(--row-saldo)}
+table.flujo tr.saldo td:first-child{background:var(--row-saldo)}
 table.flujo td.click{cursor:pointer}
-table.flujo td.click:hover{background:#e9f3ec}
-tr.pagado td{color:#98a09b;text-decoration:line-through}
-.tag{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;background:var(--soft);color:var(--brand)}
+table.flujo td.click:hover{background:var(--hover)}
+tr.pagado td{color:#90a4ae;text-decoration:line-through}
+.tag{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;background:#e3e8eb;color:var(--brand)}
 .tag.cxp{background:#fbecea;color:var(--out)}.tag.cxc{background:#e7f4ec;color:var(--in)}.tag.man{background:#fff4d6;color:#8a5a00}
 .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
 .muted{color:var(--muted)}.small{font-size:12px}
@@ -80,11 +83,26 @@ tr.pagado td{color:#98a09b;text-decoration:line-through}
 .form label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
 .form .full{grid-column:1/-1}
 .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
-.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1c2420;color:#fff;padding:10px 16px;border-radius:8px;z-index:60;box-shadow:0 4px 12px #0004;max-width:90vw}
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#263238;color:#fff;padding:10px 16px;border-radius:8px;z-index:60;box-shadow:0 4px 12px #0004;max-width:90vw}
 .chart{width:100%;height:190px}
 .login{max-width:360px;margin:12vh auto}
 .bulk{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:8px 0}
 .hide{display:none!important}
+.form .fld{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+.ac{position:relative}
+.ac input{width:100%}
+.ac-list{position:absolute;left:0;right:0;top:100%;margin-top:2px;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 20px #0002;max-height:260px;overflow:auto;z-index:70}
+.ac-i{padding:7px 10px;cursor:pointer;color:var(--ink);font-size:13px;display:flex;justify-content:space-between;gap:8px}
+.ac-i.on,.ac-i:hover{background:var(--soft)}
+.ac-i.new{color:var(--brand);font-weight:600;border-top:1px solid var(--line)}
+.ac-i.vacio{color:var(--muted);cursor:default}
+.docbox{grid-column:1/-1;border:1px solid var(--line);background:#f7f9fa;border-radius:8px;padding:10px;display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px}
+.docbox .sub{grid-column:1/-1;display:grid;grid-template-columns:1fr 2fr auto auto;gap:8px;align-items:end;border-top:1px dashed var(--line);padding-top:8px}
+.aux-ok{font-size:11px;color:var(--in)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff}
+.seg button{border:0;background:none;padding:7px 14px;cursor:pointer}
+.seg button.on{background:var(--brand);color:#fff}
+@media (max-width:760px){.docbox,.docbox .sub{grid-template-columns:1fr}}
 @media (max-width:760px){
   header.top{padding:8px 12px;padding-top:calc(8px + env(safe-area-inset-top))}
   header.top h1{font-size:16px}
@@ -102,8 +120,8 @@ tr.pagado td{color:#98a09b;text-decoration:line-through}
   table.cards td{border:0;padding:1px 0;white-space:normal;text-align:left!important}
   table.cards td[data-l]::before{content:attr(data-l) ": ";color:var(--muted);font-size:12px}
 }
-@media (min-width:761px){nav.tabs button .ic,nav.tabs .sm{display:none}}
-@media (max-width:760px){nav.tabs .lg{display:none}.banner{font-size:12px;padding:6px 10px}}
+@media (min-width:761px){nav.tabs button .ic,nav.tabs .sm,header.top h1 .sm{display:none}}
+@media (max-width:760px){nav.tabs .lg,header.top h1 .lg{display:none}.banner{font-size:12px;padding:6px 10px}}
 </style>
 </head>
 <body>
@@ -111,11 +129,19 @@ tr.pagado td{color:#98a09b;text-decoration:line-through}
 <script>
 'use strict';
 /* =====================================================================
-   FluxCaja · Flujo de caja multiempresa / multicuenta
+   Flujo de Caja Consolidado · multiempresa / multicuenta
    Datos: Firebase Firestore (config.js) o modo local (localStorage)
    ===================================================================== */
+const APP_NAME = 'Flujo de Caja Consolidado';
+const APP_VERSION = '1.3.0';             // sube también VERSION en sw.js al publicar
+const CHANGELOG = [
+  ['1.3.0','22-09-2026','Auxiliar de clientes y proveedores (RUT validado). Cobranza clientes y Pago proveedores exigen cliente/proveedor y N° de documento con buscador dinámico por RUT o nombre. Los documentos importados alimentan el auxiliar y reemplazan los ingresados a mano con el mismo RUT y folio.'],
+  ['1.2.0','22-09-2026','Nuevo nombre "Flujo de Caja Consolidado" y número de versión visible.'],
+  ['1.1.0','22-09-2026','Paleta de colores azul grisáceo e ícono nuevo.'],
+  ['1.0.0','22-09-2026','Versión inicial: empresas, cuentas, importación Excel CxC/CxP, movimientos manuales, flujo consolidado.'],
+];
 const PFX = 'fc_';                       // prefijo de colecciones en Firestore
-const COLS = ['empresas','cuentas','movimientos','config'];
+const COLS = ['empresas','cuentas','movimientos','config','auxiliares'];
 const CAT_CXC = 'Cobranza clientes', CAT_CXP = 'Pago proveedores';
 const CATEGORIAS = {
   ingreso:['Cobranza clientes','Crédito bancario (desembolso)','Línea de crédito (giro)','Aporte de socios','Préstamo empresa relacionada','Traspaso entre cuentas','Venta de activos','Otros ingresos'],
@@ -138,8 +164,13 @@ const fmtK = n => { const a=Math.abs(n); const s = a>=1e9? (a/1e9).toFixed(1)+' 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,9);
 function hashId(s){let h1=0xdeadbeef,h2=0x41c6ce57;for(let i=0;i<s.length;i++){const c=s.charCodeAt(i);h1=Math.imul(h1^c,2654435761);h2=Math.imul(h2^c,1597334677);}h1=Math.imul(h1^(h1>>>16),2246822507)^Math.imul(h2^(h2>>>13),3266489909);h2=Math.imul(h2^(h2>>>16),2246822507)^Math.imul(h1^(h1>>>13),3266489909);return (h2>>>0).toString(16).padStart(8,'0')+(h1>>>0).toString(16).padStart(8,'0');}
 const ls = { get(k,d){ try{ const v = localStorage.getItem(k); return v==null? d : JSON.parse(v); }catch(e){ return d; } }, set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} } };
-function toast(msg, ms=2600){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(), ms); }
+function toast(msg, ms=2600){ document.querySelectorAll('.toast').forEach(x=>x.remove()); const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(), ms); }
 const normRut = r => String(r||'').toUpperCase().replace(/[^0-9K]/g,'');
+const normTxt = s => String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+function dvRut(num){ let s=0,m=2; for(let i=num.length-1;i>=0;i--){ s+= +num[i]*m; m = m===7?2:m+1; } const r = 11-(s%11); return r===11?'0': r===10?'K': String(r); }
+function rutValido(r){ const n = normRut(r); if(n.length<2) return false; const cuerpo=n.slice(0,-1), dv=n.slice(-1); return /^\d+$/.test(cuerpo) && dvRut(cuerpo)===dv; }
+function fmtRut(r){ const n = normRut(r); if(n.length<2) return String(r||''); const c=n.slice(0,-1), dv=n.slice(-1); return c.replace(/\B(?=(\d{3})+(?!\d))/g,'.')+'-'+dv; }
+const TIPOS_DOC = [['FAC','Factura'],['FEX','Factura exenta'],['BOL','Boleta'],['NC','Nota de crédito'],['ND','Nota de débito'],['GD','Guía de despacho'],['OTR','Otro']];
 function parseMonto(v){
   if(v==null || v==='') return null;
   if(typeof v==='number') return Math.round(v);
@@ -165,7 +196,7 @@ function parseFecha(v){
    ===================================================================== */
 const Store = {
   mode:'local', db:null, user:null,
-  data:{empresas:[],cuentas:[],movimientos:[],config:[]},
+  data:{empresas:[],cuentas:[],movimientos:[],config:[],auxiliares:[]},
   unsub:[],
   get hasFirebase(){ const c = window.FLUXCAJA_FIREBASE; return !!(c && c.apiKey && c.projectId && window.firebase); },
   initLocal(){
@@ -229,6 +260,42 @@ const cuentaLabel = c => c ? `${c.alias || c.banco} ${c.numero? '· '+c.numero :
 const cfg = key => (Store.data.config.find(c=>c.id===key)||{}).valor;
 const fEf = m => m.fechaProg || m.fecha;            // fecha efectiva (reprogramada o vencimiento)
 const efecto = m => (m.tipo==='ingreso'? 1 : -1) * (m.monto||0);
+const esDocCat = c => c===CAT_CXC || c===CAT_CXP;
+const auxId = rut => 'a_' + normRut(rut);
+const aux = id => Store.data.auxiliares.find(a=>a.id===id);
+const auxTipoDe = cat => cat===CAT_CXC ? 'cliente' : 'proveedor';
+const AUX_LBL = {cliente:'Cliente', proveedor:'Proveedor', ambos:'Cliente y proveedor'};
+function buscarAux(q, tipo){
+  const L = Store.data.auxiliares.filter(a => !tipo || a.tipo===tipo || a.tipo==='ambos');
+  const nq = normTxt(q).trim(); const nr = normRut(q); const esRut = /\d{2,}/.test(q);
+  if(!nq) return [...L].sort((a,b)=>a.nombre.localeCompare(b.nombre)).slice(0,30);
+  const ws = nq.split(/\s+/);
+  const res = [];
+  L.forEach(a => {
+    const nn = normTxt(a.nombre), ar = normRut(a.rut); let sc = -1;
+    if(esRut && nr && ar.startsWith(nr)) sc = 0;
+    else if(esRut && nr.length>=3 && ar.includes(nr)) sc = 1;
+    else if(nn.startsWith(nq)) sc = 2;
+    else if(ws.every(w=>nn.includes(w))) sc = 3;
+    if(sc>=0) res.push([sc,a]);
+  });
+  return res.sort((x,y)=>x[0]-y[0] || x[1].nombre.localeCompare(y[1].nombre)).slice(0,30).map(x=>x[1]);
+}
+/* agrega/actualiza auxiliares a partir de [{rut,nombre,tipo}] */
+async function upsertAux(lista){
+  const map = new Map(Store.data.auxiliares.map(a=>[a.id,{...a}])); const cambios = new Map();
+  lista.forEach(({rut,nombre,tipo}) => {
+    const n = normRut(rut); if(n.length<2) return;
+    const id = 'a_'+n; const x = map.get(id);
+    if(!x){ const o = {id, rut:fmtRut(n), nombre:String(nombre||'').trim() || fmtRut(n), tipo}; map.set(id,o); cambios.set(id,o); return; }
+    let ch = false;
+    if(x.tipo!==tipo && x.tipo!=='ambos'){ x.tipo='ambos'; ch=true; }
+    if((!x.nombre || x.nombre===x.rut) && nombre){ x.nombre=String(nombre).trim(); ch=true; }
+    if(ch) cambios.set(id,x);
+  });
+  await Store.putMany('auxiliares', [...cambios.values()]);
+  return cambios.size;
+}
 
 /* =====================================================================
    ESTADO DE UI
@@ -254,7 +321,7 @@ function render(){
   const tabs = [['flujo','📈','Flujo'],['mov','📋','Movimientos'],['imp','📥','Importar'],['ctas','🏦','Empresas y cuentas'],['ajustes','⚙️','Ajustes']];
   app.innerHTML = `
   <header class="top">
-    <h1>FluxCaja</h1>
+    <h1><span class="lg">Flujo de Caja Consolidado</span><span class="sm">Flujo Consolidado</span> <span class="ver" title="Versión de la app">v${APP_VERSION}</span></h1>
     <select id="selEmp" onchange="setEmp(this.value)" title="Empresa">
       <option value="*">Holding (todas)</option>
       ${E().map(e=>`<option value="${e.id}" ${UI.emp===e.id?'selected':''}>${esc(e.nombre)}</option>`).join('')}
@@ -271,7 +338,7 @@ function render(){
 function afterRender(){ if(UI.tab==='flujo') drawChart(); }
 
 function viewLogin(){
-  return `<div class="login card"><h2>FluxCaja · Ingresar</h2>
+  return `<div class="login card"><h2>${APP_NAME} · Ingresar</h2>
     <form onsubmit="doLogin(event)" class="form" style="grid-template-columns:1fr">
       <label>Correo<input id="lgE" type="email" required autocomplete="username"></label>
       <label>Contraseña<input id="lgP" type="password" required autocomplete="current-password"></label>
@@ -337,8 +404,8 @@ function calcFlujo(empSel, ctaSel, gran, n){
   const neto = cols.map((_,i)=>ti[i]-te[i]);
   const sIni=[], sFin=[]; let s = saldoIni;
   cols.forEach((_,i)=>{ sIni.push(s); s+=neto[i]; sFin.push(s); });
-  const cxc = movs.filter(m=>m.tipo==='ingreso' && m.origen==='cxc').reduce((a,m)=>a+m.monto,0);
-  const cxp = movs.filter(m=>m.tipo==='egreso' && m.origen==='cxp').reduce((a,m)=>a+m.monto,0);
+  const cxc = movs.filter(m=>m.categoria===CAT_CXC).reduce((a,m)=>a+m.monto,0);
+  const cxp = movs.filter(m=>m.categoria===CAT_CXP).reduce((a,m)=>a+m.monto,0);
   let min = Infinity, minI = 0; sFin.forEach((v,i)=>{ if(v<min){min=v;minI=i;} });
   return {cols, cells, ids, ti, te, neto, sIni, sFin, saldoIni, cupo, cxc, cxp, fuera, min, minCol: cols[minI], ctas};
 }
@@ -396,8 +463,8 @@ function viewResumenEmpresas(){
   const rows = E().map(e => {
     const saldo = cuentasDe(e.id).reduce((s,c)=>s+(+c.saldo||0),0);
     const pend = Store.data.movimientos.filter(m=>m.empresaId===e.id && m.estado!=='pagado');
-    const cxc = pend.filter(m=>m.origen==='cxc').reduce((s,m)=>s+m.monto,0);
-    const cxp = pend.filter(m=>m.origen==='cxp').reduce((s,m)=>s+m.monto,0);
+    const cxc = pend.filter(m=>m.categoria===CAT_CXC).reduce((s,m)=>s+m.monto,0);
+    const cxp = pend.filter(m=>m.categoria===CAT_CXP).reduce((s,m)=>s+m.monto,0);
     const p30 = saldo + pend.filter(m=>fEf(m)<=lim).reduce((s,m)=>s+efecto(m),0);
     return `<tr style="cursor:pointer" onclick="setEmp('${e.id}')"><td data-l="Empresa"><span class="dot" style="background:${esc(e.color||'#888')}"></span>${esc(e.nombre)}</td><td class="n" data-l="Saldo bancos">${fmt(saldo)}</td><td class="n pos" data-l="CxC">${fmt(cxc)}</td><td class="n neg" data-l="CxP">${fmt(cxp)}</td><td class="n ${p30<0?'neg':''}" data-l="Saldo a 30 días"><b>${fmt(p30)}</b></td></tr>`;
   }).join('');
@@ -411,13 +478,13 @@ function drawChart(){
   const mx = Math.max(0,...v), mn = Math.min(0,...v); const rng = (mx-mn)||1;
   const y = x => P.t + (mx-x)/rng*(H-P.t-P.b);
   const bw = (W-P.l-P.r)/v.length;
-  let s = `<line x1="${P.l}" x2="${W-P.r}" y1="${y(0)}" y2="${y(0)}" stroke="#bbb"/>`;
+  let s = `<line x1="${P.l}" x2="${W-P.r}" y1="${y(0)}" y2="${y(0)}" stroke="#b0bec5"/>`;
   v.forEach((val,i)=>{
     const x = P.l + i*bw + bw*.15, w = bw*.7, y0=y(0), y1=y(val);
-    s += `<rect x="${x}" y="${Math.min(y0,y1)}" width="${w}" height="${Math.max(1,Math.abs(y1-y0))}" rx="2" fill="${val<0?'#c9594a':(i===0?'#9fb8aa':'#2e7355')}"><title>${lab[i]}: ${fmt(val)}</title></rect>`;
-    if(v.length<=20 || i%Math.ceil(v.length/15)===0) s += `<text x="${x+w/2}" y="${H-6}" font-size="10" text-anchor="middle" fill="#66706a">${esc(lab[i])}</text>`;
+    s += `<rect x="${x}" y="${Math.min(y0,y1)}" width="${w}" height="${Math.max(1,Math.abs(y1-y0))}" rx="2" fill="${val<0?'#c9594a':(i===0?'#b0bec5':'#546e7a')}"><title>${lab[i]}: ${fmt(val)}</title></rect>`;
+    if(v.length<=20 || i%Math.ceil(v.length/15)===0) s += `<text x="${x+w/2}" y="${H-6}" font-size="10" text-anchor="middle" fill="#607d8b">${esc(lab[i])}</text>`;
   });
-  s += `<text x="${P.l}" y="10" font-size="10" fill="#66706a">Saldo final por período · máx ${fmtK(mx)}${mn<0?' · mín '+fmtK(mn):''}</text>`;
+  s += `<text x="${P.l}" y="10" font-size="10" fill="#607d8b">Saldo final por período · máx ${fmtK(mx)}${mn<0?' · mín '+fmtK(mn):''}</text>`;
   svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.innerHTML = s;
 }
 addEventListener('resize', ()=>{ clearTimeout(window._rz); window._rz=setTimeout(()=>{ if(UI.tab==='flujo') drawChart(); },150); });
@@ -449,7 +516,7 @@ function filtrarMov(){
     (f.origen==='*' || m.origen===f.origen) &&
     (f.estado==='*' || (f.estado==='pend' ? m.estado!=='pagado' : m.estado==='pagado')) &&
     (!f.desde || fEf(m)>=f.desde) && (!f.hasta || fEf(m)<=f.hasta) &&
-    (!q || [m.contraparte,m.rut,m.folio,m.glosa,m.categoria,m.tipoDoc].join(' ').toLowerCase().includes(q))
+    (!q || [m.contraparte,m.rut,m.folio,m.glosa,m.categoria,m.tipoDoc].join(' ').toLowerCase().includes(q) || (/\d{4}/.test(q) && normRut(m.rut).includes(normRut(q))))
   ).sort((a,b)=>fEf(a).localeCompare(fEf(b)));
 }
 function tablaMov(ms, selectable){
@@ -537,12 +604,13 @@ function editMov(id, nuevo){
     <label>Empresa<select id="mE" onchange="$('#mC').innerHTML=opcionesCuentas(this.value);">${E().map(e=>`<option value="${e.id}" ${m.empresaId===e.id?'selected':''}>${esc(e.nombre)}</option>`).join('')}</select></label>
     <label>Cuenta<select id="mC">${opcionesCuentas(m.empresaId, m.cuentaId)}</select></label>
     <label>Tipo<select id="mT" onchange="tipoMovChange()">${esNuevo?`<option value="traspaso">Traspaso entre cuentas / empresas</option>`:''}<option value="ingreso" ${m.tipo==='ingreso'?'selected':''}>Ingreso</option><option value="egreso" ${m.tipo==='egreso'?'selected':''}>Egreso</option></select></label>
-    <label id="lCat">Categoría<select id="mK">${opcionesCat(m.tipo, m.categoria)}</select></label>
+    <label id="lCat">Categoría<select id="mK" onchange="catMovChange()">${opcionesCat(m.tipo, m.categoria)}</select></label>
     <label id="lDest" class="hide">Cuenta destino<select id="mD">${Store.data.cuentas.filter(c=>c.id!==m.cuentaId).map(c=>`<option value="${c.id}">${esc(empresa(c.empresaId)?.nombre)} · ${esc(cuentaLabel(c))}</option>`).join('')}</select></label>
     <label>${imp?'Fecha vencimiento':'Fecha'}<input type="date" id="mF" value="${m.fecha||''}"></label>
     ${esNuevo?'':`<label>Fecha reprogramada (opcional)<input type="date" id="mFP" value="${m.fechaProg||''}"></label>`}
     <label>Monto${esNuevo?' (por cuota)':''}<input type="number" id="mM" value="${m.monto??''}" step="1" inputmode="numeric"></label>
-    <label>Contraparte<input id="mP" value="${esc(m.contraparte||'')}" placeholder="Banco, proveedor, cliente…"></label>
+    <label id="lP">Contraparte<input id="mP" value="${esc(m.contraparte||'')}" placeholder="Banco, institución, persona…"></label>
+    ${imp?'':docBoxHtml(m)}
     ${imp?`<label>Documento<input disabled value="${esc([m.tipoDoc,m.folio].filter(Boolean).join(' '))} ${esc(m.rut||'')}"></label>`:''}
     <label class="full">Glosa<input id="mG" value="${esc(m.glosa||'')}" placeholder="Ej: Crédito BCI N° 123, Leasing camión…"></label>
     ${esNuevo?`<label>Repetir (N° cuotas)<input type="number" id="mN" value="1" min="1" max="360"></label>
@@ -555,16 +623,96 @@ function editMov(id, nuevo){
     <span style="flex:1"></span>
     <button class="btn" onclick="closeModal()">Cancelar</button><button class="btn pri" onclick="guardarMov(${esNuevo?'null':`'${m.id}'`})">Guardar</button>
   </div>`);
+  window._movImp = imp;
+  _auxSel = m.auxId && aux(m.auxId) ? m.auxId : (m.rut && aux(auxId(m.rut)) ? auxId(m.rut) : null);
+  if(!imp) catMovChange();
 }
 function tipoMovChange(){
   const t = $('#mT').value; const tr = t==='traspaso';
   $('#lCat').classList.toggle('hide', tr); $('#lDest').classList.toggle('hide', !tr);
   if(!tr) $('#mK').innerHTML = opcionesCat(t);
+  catMovChange();
+}
+
+/* ---------- bloque documento + buscador de auxiliar ---------- */
+let _auxSel = null, _acIdx = -1;
+function docBoxHtml(m){
+  const a = m.auxId ? aux(m.auxId) : null;
+  return `<div id="docBox" class="docbox hide">
+    <div class="fld"><span id="auxLbl">Cliente *</span>
+      <div class="ac"><input id="mAux" autocomplete="off" placeholder="Buscar por RUT o nombre…" value="${esc(a? a.nombre+' · '+a.rut : (m.contraparte? m.contraparte+(m.rut?' · '+m.rut:''):''))}"
+        oninput="_auxSel=null;auxBuscar()" onfocus="auxBuscar()" onblur="setTimeout(auxCerrar,150)" onkeydown="auxTecla(event)">
+      <div id="mAuxL" class="ac-list hide"></div></div>
+      <span id="auxInfo" class="aux-ok"></span></div>
+    <label>Tipo documento<select id="mTD">${TIPOS_DOC.map(([k,l])=>`<option value="${k}" ${(m.tipoDoc||'FAC')===k?'selected':''}>${l}</option>`).join('')}</select></label>
+    <label>N° documento *<input id="mFo" value="${esc(m.folio||'')}" inputmode="numeric" placeholder="Folio"></label>
+    <div id="auxNew" class="sub hide">
+      <label>RUT<input id="anR" placeholder="76.123.456-7"></label>
+      <label>Nombre / razón social<input id="anN"></label>
+      <button class="btn pri sm" type="button" onclick="auxCrearInline()">Guardar</button>
+      <button class="btn sm" type="button" onclick="$('#auxNew').classList.add('hide')">Cancelar</button>
+    </div>
+  </div>`;
+}
+function catMovChange(){
+  const box = $('#docBox'); if(!box || window._movImp) return;
+  const t = $('#mT').value, cat = $('#mK').value; const need = t!=='traspaso' && esDocCat(cat);
+  box.classList.toggle('hide', !need); $('#lP').classList.toggle('hide', need);
+  if(need){ $('#auxLbl').textContent = (cat===CAT_CXC?'Cliente':'Proveedor')+' *'; $('#mAux').placeholder = `Buscar ${cat===CAT_CXC?'cliente':'proveedor'} por RUT o nombre…`; auxInfo(); }
+}
+function auxInfo(){
+  const a = _auxSel && aux(_auxSel); const el = $('#auxInfo'); if(!el) return;
+  el.textContent = a ? `✓ ${AUX_LBL[a.tipo]} seleccionado` : '';
+}
+function auxBuscar(){
+  const q = $('#mAux').value; const tipo = auxTipoDe($('#mK').value);
+  const r = buscarAux(q, tipo); const L = $('#mAuxL'); _acIdx = -1;
+  const nombreT = tipo==='cliente'?'cliente':'proveedor';
+  L.innerHTML = r.map(a=>`<div class="ac-i" data-id="${a.id}" onmousedown="auxElegir('${a.id}')"><span>${esc(a.nombre)}</span><span class="muted small">${esc(a.rut)}</span></div>`).join('')
+    + (!r.length && !q.trim() ? `<div class="ac-i vacio">Aún no hay ${nombreT}s en el auxiliar</div>` : '')
+    + (!r.length && q.trim() ? `<div class="ac-i vacio">Sin coincidencias</div>` : '')
+    + `<div class="ac-i new" onmousedown="auxNuevoInline()">+ Crear ${nombreT}${q.trim()?` "${esc(q.trim())}"`:''}</div>`;
+  L.classList.remove('hide');
+}
+function auxCerrar(){ $('#mAuxL')?.classList.add('hide'); }
+function auxTecla(e){
+  const L = $('#mAuxL'); if(!L || L.classList.contains('hide')){ if(e.key==='ArrowDown') auxBuscar(); return; }
+  const it = [...L.querySelectorAll('.ac-i:not(.vacio)')]; if(!it.length) return;
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){ e.preventDefault(); _acIdx = (_acIdx + (e.key==='ArrowDown'?1:-1) + it.length) % it.length; it.forEach((x,i)=>x.classList.toggle('on',i===_acIdx)); it[_acIdx].scrollIntoView({block:'nearest'}); }
+  else if(e.key==='Enter'){ e.preventDefault(); const x = it[_acIdx>=0?_acIdx:0]; x.dispatchEvent(new MouseEvent('mousedown')); }
+  else if(e.key==='Escape'){ e.stopPropagation(); auxCerrar(); }
+}
+function auxElegir(id){
+  const a = aux(id); if(!a) return; _auxSel = id;
+  $('#mAux').value = `${a.nombre} · ${a.rut}`; auxCerrar(); auxInfo(); $('#mFo').focus();
+}
+function auxNuevoInline(){
+  const q = $('#mAux').value.trim(); $('#auxNew').classList.remove('hide');
+  if(/\d{5,}/.test(q)){ $('#anR').value = fmtRut(q); $('#anN').value=''; setTimeout(()=>$('#anN').focus(),0); }
+  else { $('#anN').value = q; $('#anR').value=''; setTimeout(()=>$('#anR').focus(),0); }
+}
+async function auxCrearInline(){
+  const r = $('#anR').value, n = $('#anN').value.trim(); const tipo = auxTipoDe($('#mK').value);
+  if(!rutValido(r)){ toast('RUT no válido (revisa el dígito verificador)'); return; }
+  if(!n){ toast('Ingresa el nombre'); return; }
+  const id = auxId(r); const x = aux(id);
+  if(x){ toast(`Ya existe: ${x.nombre}`); if(x.tipo!==tipo && x.tipo!=='ambos') await Store.put('auxiliares',{...x, tipo:'ambos'}); }
+  else await Store.put('auxiliares', {id, rut:fmtRut(r), nombre:n, tipo});
+  $('#auxNew').classList.add('hide'); auxElegir(id);
 }
 async function guardarMov(id){
   const g = s => $(s)?.value;
   const base = { empresaId:g('#mE'), cuentaId:g('#mC')||null, fecha:g('#mF'), monto:Math.round(+g('#mM')||0), contraparte:g('#mP').trim(), glosa:g('#mG').trim() };
   if(!base.fecha || !base.monto){ toast('Fecha y monto son obligatorios'); return; }
+  const tSel = g('#mT'), catSel = g('#mK');
+  if(!window._movImp && tSel!=='traspaso' && esDocCat(catSel)){
+    const a = _auxSel && aux(_auxSel); const quien = catSel===CAT_CXC?'cliente':'proveedor';
+    if(!a){ toast(`Selecciona el ${quien} desde el buscador (o créalo)`); $('#mAux').focus(); return; }
+    const folio = g('#mFo').trim(); if(!folio){ toast('Ingresa el N° de documento'); $('#mFo').focus(); return; }
+    Object.assign(base, {auxId:a.id, rut:a.rut, contraparte:a.nombre, tipoDoc:g('#mTD'), folio});
+    const dup = Store.data.movimientos.find(x => x.id!==id && x.empresaId===base.empresaId && x.categoria===catSel && normRut(x.rut)===normRut(a.rut) && String(x.folio)===folio);
+    if(dup && !confirm(`Ya existe el documento ${dup.tipoDoc||''} ${folio} de ${a.nombre} (${fmt(dup.monto)}, ${fDate(fEf(dup))}). ¿Guardar de todas formas?`)) return;
+  }
   if(id){
     const m = Store.data.movimientos.find(x=>x.id===id);
     const nm = {...m, ...base, tipo:g('#mT'), categoria:g('#mK'), fechaProg:g('#mFP')||null, estado:g('#mS')};
@@ -687,6 +835,7 @@ function impPreview(){
     const cta = m.cuenta!=null ? matchCta(get('cuenta')) : null;
     docs.push({ id:'d_'+hashId(clave), clave, empresaId:emp, origen:st.origen, tipo, categoria: st.origen==='cxc'?CAT_CXC:CAT_CXP,
       fecha, monto: Math.abs(monto) * (monto<0?-1:1), contraparte, rut, tipoDoc, folio, emision: parseFecha(get('emision')), glosa:String(get('glosa')||'').trim(),
+      auxId: normRut(rut).length>1 ? auxId(rut) : null,
       _cta: cta?.id || def?.id || null, _ctaExcel: !!cta });
   });
   const existentes = Store.data.movimientos.filter(x=>x.empresaId===emp && x.origen===st.origen);
@@ -696,7 +845,11 @@ function impPreview(){
   const act = docs.filter(d=>exMap.has(d.id));
   const cambian = act.filter(d=>{ const x=exMap.get(d.id); return x.monto!==d.monto || x.fecha!==d.fecha || x.estado==='pagado'; });
   const cerrar = existentes.filter(x=>x.estado!=='pagado' && !ids.has(x.id));
-  st.prev = {docs, errs, nuevos, act, cambian, cerrar, total: docs.reduce((s,d)=>s+d.monto,0), cerrarOk: st.prev?.cerrarOk ?? true};
+  // documentos ingresados a mano con mismo RUT + folio: el importado los reemplaza
+  const cat = st.origen==='cxc'?CAT_CXC:CAT_CXP;
+  const manMap = new Map(Store.data.movimientos.filter(x=>x.empresaId===emp && x.origen==='manual' && x.categoria===cat && x.folio && x.rut).map(x=>[normRut(x.rut)+'|'+String(x.folio).trim(), x]));
+  const reempl = []; docs.forEach(d => { const x = manMap.get(normRut(d.rut)+'|'+d.folio); if(x){ d._man = x; reempl.push(x); } });
+  st.prev = {docs, errs, nuevos, act, cambian, cerrar, reempl, total: docs.reduce((s,d)=>s+d.monto,0), cerrarOk: st.prev?.cerrarOk ?? true};
   render();
 }
 function viewImpPrev(){
@@ -704,7 +857,7 @@ function viewImpPrev(){
   return `<div class="card"><h2>3 · Revisión · ${esc(e?.nombre||'')} · ${UI.imp.origen==='cxc'?'Por cobrar':'Por pagar'}</h2>
     <div class="kpis">
       <div class="kpi"><div class="l">Documentos leídos</div><div class="v">${p.docs.length}</div><div class="s">Total ${fmt(p.total)}</div></div>
-      <div class="kpi"><div class="l">Nuevos</div><div class="v pos">${p.nuevos.length}</div></div>
+      <div class="kpi"><div class="l">Nuevos</div><div class="v pos">${p.nuevos.length}</div><div class="s">${p.reempl.length? p.reempl.length+' reemplazan ingresos manuales':'&nbsp;'}</div></div>
       <div class="kpi"><div class="l">Ya existentes</div><div class="v">${p.act.length}</div><div class="s">${p.cambian.length} con cambios</div></div>
       <div class="kpi"><div class="l">Ya no aparecen</div><div class="v ${p.cerrar.length?'neg':''}">${p.cerrar.length}</div><div class="s">${fmt(p.cerrar.reduce((s,x)=>s+x.monto,0))}</div></div>
     </div>
@@ -723,18 +876,23 @@ async function impConfirmar(){
   const exMap = new Map(Store.data.movimientos.map(x=>[x.id,x]));
   const lote = today()+' '+st.file;
   const out = p.docs.map(d => {
-    const {_cta,_ctaExcel,...doc} = d; const x = exMap.get(d.id);
+    const {_cta,_ctaExcel,_man,...doc} = d; const x = exMap.get(d.id);
     if(x){
       const cuentaId = x.cuentaManual ? x.cuentaId : (_ctaExcel ? _cta : (x.cuentaId || _cta));
       return {...x, ...doc, cuentaId, fechaProg: x.fechaProg||null, estado:'pendiente', fechaPago:null, lote};
     }
+    if(_man) return {...doc, cuentaId:_man.cuentaId||_cta, cuentaManual:!!_man.cuentaId, fechaProg:_man.fechaProg||null, estado:'pendiente', lote, creado: today()};
     return {...doc, cuentaId:_cta, estado:'pendiente', lote, creado: today()};
   });
   if(p.cerrarOk) p.cerrar.forEach(x => out.push({...x, estado:'pagado', fechaPago: today(), cerradoPorImport: lote}));
   const hdr = st.rows[st.head]||[]; const mapSave = {}; Object.entries(st.map).forEach(([k,i])=>{ if(i!=null) mapSave[k]=String(hdr[i]).toLowerCase().trim(); });
   ls.set('fc_map_'+st.origen, mapSave);
   $('#app').style.opacity=.5;
-  try{ await Store.putMany('movimientos', out); toast(`Importación lista: ${p.nuevos.length} nuevos, ${p.act.length} actualizados${p.cerrarOk&&p.cerrar.length?`, ${p.cerrar.length} cerrados`:''}`, 4000); UI.imp=null; }
+  try{
+    await Store.putMany('movimientos', out);
+    if(p.reempl.length) await Store.delMany('movimientos', p.reempl.map(x=>x.id));
+    const nAux = await upsertAux(p.docs.map(d=>({rut:d.rut, nombre:d.contraparte, tipo: st.origen==='cxc'?'cliente':'proveedor'})));
+    toast(`Importación lista: ${p.nuevos.length} nuevos, ${p.act.length} actualizados${p.cerrarOk&&p.cerrar.length?`, ${p.cerrar.length} cerrados`:''}${nAux?`, ${nAux} auxiliares agregados`:''}`, 4500); UI.imp=null; }
   catch(e){ alert('Error al importar: '+e.message); }
   $('#app').style.opacity=1; render();
 }
@@ -743,6 +901,11 @@ async function impConfirmar(){
    VISTA: EMPRESAS Y CUENTAS
    ===================================================================== */
 function viewCtas(){
+  const sub = UI.ctasSub || 'ctas';
+  const seg = `<div class="seg" style="margin-bottom:12px"><button class="${sub==='ctas'?'on':''}" onclick="UI.ctasSub='ctas';render()">Empresas y cuentas</button><button class="${sub==='aux'?'on':''}" onclick="UI.ctasSub='aux';render()">Clientes y proveedores</button></div>`;
+  return seg + (sub==='aux' ? viewAux() : viewCuentas());
+}
+function viewCuentas(){
   const emps = UI.emp==='*'? E() : [empresa(UI.emp)];
   return `<div class="row" style="margin-bottom:12px"><button class="btn pri" onclick="editEmpresa()">+ Empresa</button><span class="small muted">Actualiza los saldos con la cartola del día. El flujo parte desde estos saldos.</span></div>
   ${emps.map(e => { const cs = cuentasDe(e.id); const tot = cs.reduce((s,c)=>s+(+c.saldo||0),0);
@@ -756,8 +919,81 @@ function viewCtas(){
         <td><button class="btn sm" onclick="editCuenta('${c.id}')">Editar</button></td></tr>`).join('') || '<tr><td colspan="7" class="muted">Sin cuentas</td></tr>'}
       </tbody>${cs.length?`<tfoot><tr><td colspan="4"><b>Total</b></td><td class="n"><b>${fmt(tot)}</b></td><td colspan="2"></td></tr></tfoot>`:''}</table></div></div>`; }).join('')}`;
 }
+/* ---------- Auxiliar de clientes y proveedores ---------- */
+UI.aux = {q:'', tipo:'*'};
+function viewAux(){
+  const f = UI.aux; const tipo = f.tipo==='*'? null : f.tipo;
+  const lista = (f.q.trim()? buscarAux(f.q, tipo) : Store.data.auxiliares.filter(a=>!tipo||a.tipo===tipo||a.tipo==='ambos').sort((a,b)=>a.nombre.localeCompare(b.nombre)));
+  const pend = new Map(); Store.data.movimientos.forEach(m=>{ if(m.estado==='pagado'||!m.rut||!esDocCat(m.categoria)) return; const k='a_'+normRut(m.rut); const x=pend.get(k)||{n:0,cxc:0,cxp:0}; x.n++; m.categoria===CAT_CXC? x.cxc+=m.monto : x.cxp+=m.monto; pend.set(k,x); });
+  const nC = Store.data.auxiliares.filter(a=>a.tipo!=='proveedor').length, nP = Store.data.auxiliares.filter(a=>a.tipo!=='cliente').length;
+  return `<div class="card">
+    <div class="row">
+      <label>Buscar<input id="axQ" value="${esc(f.q)}" placeholder="RUT o nombre…" oninput="UI.aux.q=this.value;debAux()"></label>
+      <label>Tipo<select onchange="UI.aux.tipo=this.value;render()">${[['*','Todos'],['cliente','Clientes'],['proveedor','Proveedores']].map(([k,l])=>`<option value="${k}" ${f.tipo===k?'selected':''}>${l}</option>`).join('')}</select></label>
+      <span style="flex:1"></span>
+      <button class="btn pri" onclick="editAux()">+ Nuevo</button>
+      <label class="btn">Importar Excel<input type="file" class="hide" accept=".xlsx,.xls,.csv" onchange="auxImportExcel(this.files[0])"></label>
+      <button class="btn" onclick="auxDesdeMovs()" title="Crea el auxiliar a partir de los documentos ya cargados">Generar desde documentos</button>
+    </div>
+    <p class="small muted">${nC} clientes · ${nP} proveedores. Los documentos importados agregan automáticamente sus clientes y proveedores.</p>
+    <div class="tw" style="max-height:65vh"><table class="cards"><thead><tr><th>RUT</th><th>Nombre / razón social</th><th>Tipo</th><th class="n">Docs pendientes</th><th class="n">Por cobrar</th><th class="n">Por pagar</th><th></th></tr></thead><tbody>
+    ${lista.slice(0,500).map(a=>{ const x = pend.get(a.id)||{n:0,cxc:0,cxp:0}; return `<tr><td data-l="RUT">${esc(a.rut)}</td><td data-l="Nombre" style="white-space:normal">${esc(a.nombre)}</td><td data-l="Tipo"><span class="tag ${a.tipo==='cliente'?'cxc':a.tipo==='proveedor'?'cxp':''}">${AUX_LBL[a.tipo]}</span></td>
+      <td class="n" data-l="Docs">${x.n||'-'}</td><td class="n pos" data-l="Por cobrar">${x.cxc?fmt(x.cxc):'-'}</td><td class="n neg" data-l="Por pagar">${x.cxp?fmt(x.cxp):'-'}</td>
+      <td><button class="btn sm" onclick="editAux('${a.id}')">Editar</button> ${x.n?`<button class="btn sm" onclick="verDocsAux('${a.id}')">Ver docs</button>`:''}</td></tr>`; }).join('') || '<tr><td colspan="7" class="muted">Sin registros</td></tr>'}
+    </tbody></table></div>
+    ${lista.length>500?`<p class="small muted">Mostrando 500 de ${lista.length}.</p>`:''}
+  </div>`;
+}
+let _dax; function debAux(){ clearTimeout(_dax); _dax=setTimeout(()=>{ const pos=$('#axQ')?.selectionStart; render(); const i=$('#axQ'); if(i){ i.focus(); try{i.setSelectionRange(pos,pos);}catch(e){} } },200); }
+function verDocsAux(id){ const a = aux(id); UI.mov = {...UI.mov, q:a.rut, estado:'pend', origen:'*', cta:'*'}; UI.mov.sel = new Set(); setTab('mov'); }
+function editAux(id){
+  const a = id? aux(id) : {rut:'', nombre:'', tipo: UI.aux.tipo==='*'?'proveedor':UI.aux.tipo};
+  modal(`<h3>${id?'Editar':'Nuevo'} cliente / proveedor</h3><div class="form">
+    <label>RUT<input id="xR" value="${esc(a.rut)}" placeholder="76.123.456-7" onblur="if(rutValido(this.value)) this.value=fmtRut(this.value)"></label>
+    <label>Tipo<select id="xT">${Object.entries(AUX_LBL).map(([k,l])=>`<option value="${k}" ${a.tipo===k?'selected':''}>${l}</option>`).join('')}</select></label>
+    <label class="full">Nombre / razón social<input id="xN" value="${esc(a.nombre)}"></label>
+    <label class="full">Observación<input id="xO" value="${esc(a.obs||'')}" placeholder="Contacto, condiciones de pago…"></label></div>
+    <div class="actions">${id?`<button class="btn dan" onclick="borrarAux('${id}')">Eliminar</button>`:''}<span style="flex:1"></span><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn pri" onclick="guardarAux(${id?`'${id}'`:'null'})">Guardar</button></div>`);
+}
+async function guardarAux(id){
+  const r = $('#xR').value, n = $('#xN').value.trim();
+  if(!rutValido(r)){ toast('RUT no válido (revisa el dígito verificador)'); return; }
+  if(!n){ toast('Nombre obligatorio'); return; }
+  const nid = auxId(r);
+  if(nid!==id && aux(nid)){ toast(`Ese RUT ya existe: ${aux(nid).nombre}`); return; }
+  const o = {...(id?aux(id):{}), id:nid, rut:fmtRut(r), nombre:n, tipo:$('#xT').value, obs:$('#xO').value.trim()};
+  await Store.put('auxiliares', o);
+  // propagar nombre/RUT a los movimientos manuales enlazados
+  const rel = Store.data.movimientos.filter(m=>m.auxId===id || m.auxId===nid);
+  const upd = rel.filter(m=>m.origen==='manual').map(m=>({...m, auxId:nid, rut:o.rut, contraparte:o.nombre}));
+  if(id && id!==nid){ await Store.del('auxiliares', id); rel.filter(m=>m.origen!=='manual').forEach(m=>upd.push({...m, auxId:nid})); }
+  if(upd.length) await Store.putMany('movimientos', upd);
+  closeModal(); toast('Guardado');
+}
+async function borrarAux(id){
+  const n = Store.data.movimientos.filter(m=>m.auxId===id && m.estado!=='pagado').length;
+  if(!confirm(n? `Tiene ${n} documentos pendientes (se mantienen, solo se borra del auxiliar). ¿Eliminar?` : '¿Eliminar del auxiliar?')) return;
+  await Store.del('auxiliares', id); closeModal(); toast('Eliminado');
+}
+async function auxDesdeMovs(){
+  const n = await upsertAux(Store.data.movimientos.filter(m=>m.rut && esDocCat(m.categoria)).map(m=>({rut:m.rut, nombre:m.contraparte, tipo:auxTipoDe(m.categoria)})));
+  toast(n? `${n} registros agregados o actualizados` : 'El auxiliar ya estaba al día');
+}
+async function auxImportExcel(file){
+  if(!file) return;
+  const wb = XLSX.read(await file.arrayBuffer(), {type:'array'}); const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, raw:false, defval:''});
+  let h=-1, cR=-1, cN=-1;
+  for(let i=0;i<Math.min(rows.length,30) && h<0;i++){ const r = rows[i].map(v=>normTxt(v)); const a=r.findIndex(v=>/rut/.test(v)), b=r.findIndex(v=>/razon|nombre|proveedor|cliente/.test(v)); if(a>=0&&b>=0){h=i;cR=a;cN=b;} }
+  if(h<0){ alert('No encontré columnas de RUT y Nombre/Razón social en la primera hoja.'); return; }
+  const tipo = UI.aux.tipo==='*' ? (confirm('¿Estos registros son CLIENTES?\nAceptar = clientes · Cancelar = proveedores') ? 'cliente':'proveedor') : UI.aux.tipo;
+  const lista = rows.slice(h+1).filter(r=>rutValido(r[cR])).map(r=>({rut:r[cR], nombre:r[cN], tipo}));
+  const inval = rows.slice(h+1).filter(r=>String(r[cR]).trim() && !rutValido(r[cR])).length;
+  const n = await upsertAux(lista);
+  toast(`${n} registros agregados/actualizados${inval?` · ${inval} RUT inválidos omitidos`:''}`, 4500);
+}
+
 async function saldoRapido(id, v){ const c = cuenta(id); await Store.put('cuentas', {...c, saldo:Math.round(+v||0), fechaSaldo: today()}); toast('Saldo actualizado'); }
-const COLORES = ['#2e7355','#2f5d8a','#b7791f','#8a3b8f','#b3402f','#3b8f8a','#6b6b2e','#555'];
+const COLORES = ['#455a64','#1e88e5','#b7791f','#8a3b8f','#b3402f','#3b8f8a','#6b6b2e','#555'];
 function editEmpresa(id){
   const e = id? empresa(id) : {nombre:'', rut:'', color:COLORES[Store.data.empresas.length % COLORES.length], orden:Store.data.empresas.length};
   modal(`<h3>${id?'Editar':'Nueva'} empresa</h3><div class="form">
@@ -832,13 +1068,16 @@ function viewAjustes(){
     <div class="row"><label>Eliminar pagados con fecha anterior a<input type="date" id="lmF" value="${addMonths(today(),-6)}"></label><button class="btn dan" onclick="limpiar()">Eliminar</button></div>
   </div>
   ${Store.mode==='local'?`<div class="card"><h2>Datos de ejemplo</h2><div class="row"><button class="btn" onclick="cargarDemo()">Cargar ejemplo</button><button class="btn dan" onclick="if(confirm('¿Borrar todos los datos locales?')){COLS.forEach(c=>Store.data[c]=[]);Store.saveLocal();render();}">Borrar todo</button></div></div>`:''}
+  <div class="card"><h2>Versión ${APP_VERSION}</h2>
+    <div class="small">${CHANGELOG.map(([v,f,t])=>`<p style="margin:4px 0"><b>${v}</b> <span class="muted">${f}</span><br>${esc(t)}</p>`).join('')}</div>
+    <button class="btn sm" onclick="actualizarApp()">Buscar actualización</button></div>
   <div class="card"><h2>Instalar</h2><p class="small">En PC (Chrome/Edge): icono de instalar en la barra de direcciones. En Android: menú ⋮ › Instalar app. En iPhone (Safari): Compartir › Agregar a pantalla de inicio.</p>
-  ${window._bip?'<button class="btn pri" onclick="_bip.prompt()">Instalar FluxCaja</button>':''}</div>
+  ${window._bip?'<button class="btn pri" onclick="_bip.prompt()">Instalar app</button>':''}</div>
   </div>`;
 }
 function exportJSON(){
   const blob = new Blob([JSON.stringify({app:'fluxcaja', v:1, fecha:today(), data:Store.data},null,1)], {type:'application/json'});
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `fluxcaja_respaldo_${today()}.json`; a.click();
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `flujo_consolidado_respaldo_${today()}.json`; a.click();
 }
 async function importJSON(file){
   if(!file) return; try{
@@ -864,6 +1103,10 @@ async function cargarDemo(){
   const g=uid(); for(let i=0;i<24;i++) mv.push({id:uid(),empresaId:e1.id,cuentaId:c1.id,origen:'manual',tipo:'egreso',categoria:'Cuota crédito bancario',fecha:addMonths(addDays(t,5),i),monto:2350000,contraparte:'BCI',glosa:'Crédito comercial',estado:'pendiente',grupo:g,cuota:`${i+1}/24`});
   const g2=uid(); for(let i=0;i<12;i++) mv.push({id:uid(),empresaId:e2.id,cuentaId:c3.id,origen:'manual',tipo:'egreso',categoria:'Leasing',fecha:addMonths(addDays(t,10),i),monto:1850000,contraparte:'BCI Leasing',glosa:'Leasing camión',estado:'pendiente',grupo:g2,cuota:`${i+1}/12`});
   for(let i=0;i<4;i++) mv.push({id:uid(),empresaId:e1.id,cuentaId:c1.id,origen:'manual',tipo:'egreso',categoria:'Remuneraciones',fecha:addMonths(t.slice(0,8)+'28',i),monto:18500000,contraparte:'Personal',estado:'pendiente'});
+  const rv = n => { const c=String(n); return fmtRut(c+dvRut(c)); };
+  const rutDe = n => rv((n.startsWith('Exp')||n.startsWith('Ase')||n.startsWith('Fri') ? 96500000 : 77100000) + [...n].reduce((h,c)=>(h*31+c.charCodeAt(0))%9973,7));
+  mv.forEach(m=>{ if(m.rut){ m.rut = rutDe(m.contraparte); m.auxId = auxId(m.rut); } });
+  await upsertAux(mv.filter(m=>m.rut).map(m=>({rut:m.rut, nombre:m.contraparte, tipo:m.origen==='cxc'?'cliente':'proveedor'})));
   await Store.putMany('empresas',[e1,e2]); await Store.putMany('cuentas',[c1,c2,c3]); await Store.putMany('movimientos',mv); toast('Datos de ejemplo cargados');
 }
 
@@ -873,6 +1116,10 @@ function closeModal(){ $('#mdl')?.remove(); }
 addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
 
 /* ---------- PWA ---------- */
+async function actualizarApp(){
+  try{ const r = await navigator.serviceWorker?.getRegistration(); if(r) await r.update(); }catch(e){}
+  toast('Recargando…'); setTimeout(()=>location.reload(), 600);
+}
 addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); window._bip=e; });
 if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(()=>{});
 
