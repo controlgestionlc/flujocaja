@@ -98,6 +98,10 @@ input:disabled{background:var(--soft);border-color:var(--line2);color:var(--mute
 .kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;margin-bottom:16px}
 .kpi{background:var(--card);border-radius:1rem;box-shadow:var(--shadow);padding:14px 16px;min-height:132px;display:flex;flex-direction:column;transition:box-shadow .15s}
 .kpi:hover{box-shadow:var(--shadow-h)}
+.kpi.clk{cursor:pointer;position:relative}
+.kpi.clk::after{content:"›";position:absolute;right:14px;top:10px;font-size:20px;color:var(--brand);opacity:.5}
+.kpi.clk:hover{outline:2px solid var(--brand);outline-offset:-2px}
+.kpi.clk:hover::after{opacity:1}
 .kpi .l{font-size:14px;font-weight:700;color:var(--ink)}
 .kpi .v{font-size:26px;font-weight:300;margin-top:auto;padding-top:10px;font-variant-numeric:tabular-nums;letter-spacing:-.3px;color:var(--ink)}
 .kpi .s{font-size:12px;color:var(--muted);margin-top:4px}
@@ -220,8 +224,9 @@ tr.pagado td[data-l="Monto"],tr.pagado td[data-l="Contraparte"]{text-decoration:
    Datos: Firebase Firestore (config.js) o modo local (localStorage)
    ===================================================================== */
 const APP_NAME = 'Flujo de Caja Consolidado';
-const APP_VERSION = '1.7.0';             // sube también VERSION en sw.js al publicar
+const APP_VERSION = '1.7.1';             // sube también VERSION en sw.js al publicar
 const CHANGELOG = [
+  ['1.7.1','23-09-2026','Tarjetas del Flujo clicables: saldo bancos (detalle por cuenta), por cobrar y por pagar (cartera completa por contraparte, período y detalle), saldo final (por período) y saldo mínimo (período del mínimo).'],
   ['1.7.0','23-09-2026','Etiquetas del flujo clicables con ventana de detalle: cada categoría (por contraparte, por período y detalle con pagar/editar y exportar a Excel), saldo inicial por cuenta, composición de totales, flujo neto y saldo final por período, y cada columna de período.'],
   ['1.6.0','23-09-2026','Dar por pagados los compromisos (fecha y cuenta de pago). Saldo bancario teórico por cuenta = último saldo real + pagos registrados. Nueva pestaña Conciliación: ingreso semanal del saldo real, diferencia contra el teórico, historial y análisis de diferencias (pendientes no marcados, coincidencias exactas, registro de documento faltante). El flujo proyectado parte del saldo teórico.'],
   ['1.5.0','23-09-2026','Importación con el formato REGISTRO FLUJO CAJA (TIPO, DOCUMENTO, NUMERO DOC, FECHA EMISION, VENCIMIENTO, RUT, AUXILIAR, IMPORTE A PAGAR) en un solo archivo de ingresos y egresos. Validación anti-duplicados: omite lo ya ingresado (importado o manual) y los repetidos dentro del archivo; detalle fila por fila antes de cargar. Remuneraciones, imposiciones, impuestos, leasing, etc. se cargan en su categoría. El ingreso manual bloquea documentos duplicados.'],
@@ -531,7 +536,7 @@ function calcFlujo(empSel, ctaSel, gran, n){
   const cxc = movs.filter(m=>m.categoria===CAT_CXC).reduce((a,m)=>a+m.monto,0);
   const cxp = movs.filter(m=>m.categoria===CAT_CXP).reduce((a,m)=>a+m.monto,0);
   let min = Infinity, minI = 0; sFin.forEach((v,i)=>{ if(v<min){min=v;minI=i;} });
-  return {cols, cells, ids, ti, te, neto, sIni, sFin, saldoIni, saldoReal, cupo, cxc, cxp, fuera, min, minCol: cols[minI], ctas};
+  return {movs, cols, cells, ids, ti, te, neto, sIni, sFin, saldoIni, saldoReal, cupo, cxc, cxp, fuera, min, minCol: cols[minI], ctas};
 }
 let _flujo = null;
 function viewFlujo(){
@@ -546,11 +551,11 @@ function viewFlujo(){
   const ultimo = r.sFin[r.sFin.length-1];
   return `
   <div class="kpis">
-    <div class="kpi" style="cursor:pointer" onclick="setTab('conc')"><div class="l">Saldo bancos teórico</div><div class="v ${r.saldoIni<0?'neg':''}">${fmt(r.saldoIni)}</div><div class="s">Último real ${fmt(r.saldoReal)} · ${r.ctas.length} cuenta(s)${r.cupo?` · líneas ${fmtK(r.cupo)}`:''}</div></div>
-    <div class="kpi"><div class="l">Por cobrar (CxC)</div><div class="v pos">${fmt(r.cxc)}</div><div class="s">Vencido: ${fmt(r.cells.ingreso[CAT_CXC]?.[0]||0)}</div></div>
-    <div class="kpi"><div class="l">Por pagar (CxP)</div><div class="v neg">${fmt(r.cxp)}</div><div class="s">Vencido: ${fmt(r.cells.egreso[CAT_CXP]?.[0]||0)}</div></div>
-    <div class="kpi"><div class="l">Saldo al ${fDate(r.cols[r.cols.length-1].fin)}</div><div class="v ${ultimo<0?'neg':''}">${fmt(ultimo)}</div><div class="s">${r.fuera? r.fuera+' mov. fuera del horizonte':'&nbsp;'}</div></div>
-    <div class="kpi"><div class="l">Saldo mínimo proyectado</div><div class="v ${r.min<0?'neg':''}">${fmt(r.min)}</div><div class="s">${esc(r.minCol.label)}${r.min<0 && r.cupo? ` · con líneas ${fmt(r.min+r.cupo)}`:''}</div></div>
+    <div class="kpi clk" onclick="detSaldoIni()" title="Ver detalle por cuenta"><div class="l">Saldo bancos teórico</div><div class="v ${r.saldoIni<0?'neg':''}">${fmt(r.saldoIni)}</div><div class="s">Último real ${fmt(r.saldoReal)} · ${r.ctas.length} cuenta(s)${r.cupo?` · líneas ${fmtK(r.cupo)}`:''}</div></div>
+    <div class="kpi clk" onclick="detCartera(CAT_CXC,1)" title="Ver cartera por cobrar"><div class="l">Por cobrar (CxC)</div><div class="v pos">${fmt(r.cxc)}</div><div class="s">Vencido: ${fmt(r.cells.ingreso[CAT_CXC]?.[0]||0)}</div></div>
+    <div class="kpi clk" onclick="detCartera(CAT_CXP,1)" title="Ver cartera por pagar"><div class="l">Por pagar (CxP)</div><div class="v neg">${fmt(r.cxp)}</div><div class="s">Vencido: ${fmt(r.cells.egreso[CAT_CXP]?.[0]||0)}</div></div>
+    <div class="kpi clk" onclick="detResumen()" title="Ver saldo por período"><div class="l">Saldo al ${fDate(r.cols[r.cols.length-1].fin)}</div><div class="v ${ultimo<0?'neg':''}">${fmt(ultimo)}</div><div class="s">${r.fuera? r.fuera+' mov. fuera del horizonte':'&nbsp;'}</div></div>
+    <div class="kpi clk" onclick="detPeriodo(${r.cols.indexOf(r.minCol)})" title="Ver el período del saldo mínimo"><div class="l">Saldo mínimo proyectado</div><div class="v ${r.min<0?'neg':''}">${fmt(r.min)}</div><div class="s">${esc(r.minCol.label)}${r.min<0 && r.cupo? ` · con líneas ${fmt(r.min+r.cupo)}`:''}</div></div>
   </div>
   <div class="card">
     <div class="row" style="margin-bottom:10px">
@@ -613,33 +618,44 @@ addEventListener('resize', ()=>{ clearTimeout(window._rz); window._rz=setTimeout
 const jsq = s => String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
 const lblCell = (txt, fn, extra='') => `<td class="lbl ${extra}" onclick="${fn}" title="Ver detalle">${esc(txt)}<svg class="i info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg></td>`;
 const movsDeIds = ids => { const s = new Set(ids); return Store.data.movimientos.filter(m=>s.has(m.id)).sort((a,b)=>fEf(a).localeCompare(fEf(b))); };
-const colDe = m => { const f = fEf(m), t = today(); if(f < t) return 0; const i = _flujo.cols.findIndex((c,i)=> i>0 && f>=c.ini && f<=c.fin); return i<0?1:i; };
+const colDe = m => { const f = fEf(m), t = today(); if(f < t) return 0; if(f > _flujo.cols[_flujo.cols.length-1].fin) return -1; const i = _flujo.cols.findIndex((c,i)=> i>0 && f>=c.ini && f<=c.fin); return i<0?1:i; };
 function kpiMini(l, v, s='', cls=''){ return `<div class="kpi" style="min-height:0"><div class="l">${l}</div><div class="v ${cls}" style="font-size:20px">${v}</div><div class="s">${s}</div></div>`; }
 UI.det = {vista:'contraparte'};
 function detCat(tipo, cat, reset){
+  const ids = (_flujo.ids[tipo+'|'+cat]||[]).flat();
+  detCore({titulo:cat, tipo, ms:movsDeIds(ids), reabrir:`detCat('${tipo}','${jsq(cat)}')`, lblTot:'Total en el horizonte'}, reset);
+}
+/* cartera completa de una categoría (KPI Por cobrar / Por pagar), incluye lo que está fuera del horizonte */
+function detCartera(cat, reset){
+  const tipo = cat===CAT_CXC ? 'ingreso' : 'egreso';
+  const ms = _flujo.movs.filter(m=>m.categoria===cat).sort((a,b)=>fEf(a).localeCompare(fEf(b)));
+  detCore({titulo: cat===CAT_CXC ? 'Por cobrar (CxC) · cartera pendiente' : 'Por pagar (CxP) · cartera pendiente', tipo, ms, reabrir:`detCartera('${jsq(cat)}')`, lblTot:'Total cartera'}, reset);
+}
+function detCore(o, reset){
   if(reset) UI.det = {vista:'contraparte', q:''};
-  const ids = (_flujo.ids[tipo+'|'+cat]||[]).flat(); const ms = movsDeIds(ids);
+  const {titulo:cat, tipo, ms, reabrir} = o; const ids = ms.map(m=>m.id);
   const tot = ms.reduce((s,m)=>s+m.monto,0), venc = ms.filter(m=>colDe(m)===0), prox = ms.find(m=>fEf(m)>=today());
   const porCp = new Map(); ms.forEach(m => { const k = (m.contraparte||'(sin contraparte)')+'|'+normRut(m.rut); const x = porCp.get(k)||{cp:m.contraparte||'(sin contraparte)', rut:m.rut, n:0, tot:0, venc:0, prox:null}; x.n++; x.tot+=m.monto; if(colDe(m)===0) x.venc+=m.monto; if(fEf(m)>=today() && (!x.prox || fEf(m)<x.prox)) x.prox=fEf(m); porCp.set(k,x); });
   const cps = [...porCp.values()].sort((a,b)=>Math.abs(b.tot)-Math.abs(a.tot));
-  const porPer = _flujo.cols.map((c,i)=>({c, v:_flujo.cells[tipo][cat][i]})).filter(x=>x.v);
+  const porPer = _flujo.cols.map((c,i)=>({c, v:ms.filter(m=>colDe(m)===i).reduce((s,m)=>s+m.monto,0)})).filter(x=>x.v);
+  const fuera = ms.filter(m=>colDe(m)===-1); if(fuera.length) porPer.push({c:{label:'Fuera del horizonte', ini:addDays(_flujo.cols[_flujo.cols.length-1].fin,1), fin:fuera.reduce((a,m)=>fEf(m)>a?fEf(m):a,'')}, v:fuera.reduce((s,m)=>s+m.monto,0)});
   const v = UI.det.vista;
   modal(`<h3>${esc(cat)} <span class="tag ${tipo==='ingreso'?'cxc':'cxp'}">${tipo==='ingreso'?'Ingreso':'Egreso'}</span></h3>
     <div class="kpis">
-      ${kpiMini('Total en el horizonte', fmt(tot), `${ms.length} compromiso(s)`, tipo==='ingreso'?'pos':'neg')}
+      ${kpiMini(o.lblTot, fmt(tot), `${ms.length} compromiso(s)`, tipo==='ingreso'?'pos':'neg')}
       ${kpiMini('Vencido', fmt(venc.reduce((s,m)=>s+m.monto,0)), `${venc.length} con fecha pasada`, venc.length?'neg':'')}
       ${kpiMini('Próximo vencimiento', prox? fDate(fEf(prox)) : '-', prox? `${esc(prox.contraparte||'')} · ${fmt(prox.monto)}`:'')}
       ${kpiMini(cps.length===1?'Contraparte':'Contrapartes', cps.length, cps[0]? `Mayor: ${esc(cps[0].cp)} (${Math.round(Math.abs(cps[0].tot)/Math.abs(tot||1)*100)}%)`:'')}
     </div>
-    <div class="tbar"><div class="seg">${[['contraparte','Por contraparte'],['periodo','Por período'],['detalle','Detalle']].map(([k,l])=>`<button class="${v===k?'on':''}" onclick="UI.det.vista='${k}';detCat('${tipo}','${jsq(cat)}')">${l}</button>`).join('')}</div><span style="flex:1"></span><button class="btn sm" onclick="exportDet('${jsq(cat)}', ${JSON.stringify(ids).replace(/"/g,'&quot;')})">${ico('xls')}Excel</button></div>
+    <div class="tbar"><div class="seg">${[['contraparte','Por contraparte'],['periodo','Por período'],['detalle','Detalle']].map(([k,l])=>`<button class="${v===k?'on':''}" onclick="UI.det.vista='${k}';${reabrir}">${l}</button>`).join('')}</div><span style="flex:1"></span><button class="btn sm" onclick="exportDet('${jsq(cat)}', ${JSON.stringify(ids).replace(/"/g,'&quot;')})">${ico('xls')}Excel</button></div>
     ${v==='contraparte' ? `<div class="tw" style="max-height:52vh"><table class="cards"><thead><tr><th>Contraparte</th><th>RUT</th><th class="n">N°</th><th class="n">Vencido</th><th class="n">Total</th><th class="n">%</th><th>Próximo venc.</th></tr></thead><tbody>
-      ${cps.map(x=>`<tr style="cursor:pointer" onclick="UI.det.vista='detalle';UI.det.q='${jsq(x.cp)}';detCat('${tipo}','${jsq(cat)}')"><td data-l="Contraparte" style="white-space:normal">${esc(x.cp)}</td><td data-l="RUT">${esc(x.rut||'')}</td><td class="n" data-l="N°">${x.n}</td><td class="n ${x.venc?'neg':''}" data-l="Vencido">${x.venc?fmt(x.venc):'-'}</td><td class="n" data-l="Total"><b>${fmt(x.tot)}</b></td><td class="n" data-l="%">${Math.round(Math.abs(x.tot)/Math.abs(tot||1)*100)}%</td><td data-l="Próximo">${fDate(x.prox)||'-'}</td></tr>`).join('')}
+      ${cps.map(x=>`<tr style="cursor:pointer" onclick="UI.det.vista='detalle';UI.det.q='${jsq(x.cp)}';${reabrir}"><td data-l="Contraparte" style="white-space:normal">${esc(x.cp)}</td><td data-l="RUT">${esc(x.rut||'')}</td><td class="n" data-l="N°">${x.n}</td><td class="n ${x.venc?'neg':''}" data-l="Vencido">${x.venc?fmt(x.venc):'-'}</td><td class="n" data-l="Total"><b>${fmt(x.tot)}</b></td><td class="n" data-l="%">${Math.round(Math.abs(x.tot)/Math.abs(tot||1)*100)}%</td><td data-l="Próximo">${fDate(x.prox)||'-'}</td></tr>`).join('')}
       </tbody><tfoot><tr><td colspan="4">Total</td><td class="n">${fmt(tot)}</td><td class="n">100%</td><td></td></tr></tfoot></table></div>`
     : v==='periodo' ? `<div class="tw" style="max-height:52vh"><table class="cards"><thead><tr><th>Período</th><th>Desde</th><th>Hasta</th><th class="n">Monto</th><th class="n">Acumulado</th></tr></thead><tbody>
       ${(()=>{ let ac=0; return porPer.map(x=>{ ac+=x.v; return `<tr><td data-l="Período"><b>${esc(x.c.label)}</b></td><td data-l="Desde">${x.c.venc?'-':fDate(x.c.ini)}</td><td data-l="Hasta">${fDate(x.c.fin)}</td><td class="n" data-l="Monto">${fmt(x.v)}</td><td class="n muted" data-l="Acumulado">${fmt(ac)}</td></tr>`; }).join(''); })()}
       </tbody></table></div>`
     : (()=>{ const q = (UI.det.q||'').toLowerCase(); const lista = q? ms.filter(m=>(m.contraparte||'').toLowerCase()===q) : ms;
-        return `${q?`<p class="small">Filtrado por <b>${esc(UI.det.q)}</b> · <a href="#" onclick="UI.det.q='';detCat('${tipo}','${jsq(cat)}');return false">ver todos</a></p>`:''}${tablaMov(lista,false)}`; })()}
+        return `${q?`<p class="small">Filtrado por <b>${esc(UI.det.q)}</b> · <a href="#" onclick="UI.det.q='';${reabrir};return false">ver todos</a></p>`:''}${tablaMov(lista,false)}`; })()}
     <div class="actions"><button class="btn" onclick="UI.det.q='';closeModal()">Cerrar</button></div>`, true);
 }
 function detSaldoIni(){
