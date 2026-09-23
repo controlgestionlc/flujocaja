@@ -159,7 +159,7 @@ tr.pagado td[data-l="Monto"],tr.pagado td[data-l="Contraparte"]{text-decoration:
 .form .full{grid-column:1/-1}
 .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap;align-items:center}
 .toast{position:fixed;bottom:32px;left:50%;transform:translateX(-50%);background:rgba(29,45,62,.92);color:#fff;padding:12px 18px;border-radius:var(--r-sm);z-index:80;box-shadow:0 4px 16px rgba(0,0,0,.25);max-width:90vw;font-size:14px}
-.chart{width:100%;height:200px}
+.chart{width:100%;height:200px;display:block}
 .login{max-width:380px;margin:12vh auto}
 .bulk{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:10px 0}
 .hide{display:none!important}
@@ -224,8 +224,9 @@ tr.pagado td[data-l="Monto"],tr.pagado td[data-l="Contraparte"]{text-decoration:
    Datos: Firebase Firestore (config.js) o modo local (localStorage)
    ===================================================================== */
 const APP_NAME = 'Flujo de Caja Consolidado';
-const APP_VERSION = '1.7.1';             // sube también VERSION en sw.js al publicar
+const APP_VERSION = '1.8.0';             // sube también VERSION en sw.js al publicar
 const CHANGELOG = [
+  ['1.8.0','23-09-2026','Gráfico del flujo con opción Barras o Línea (se recuerda la elección). Clic en una barra o punto abre el detalle del período.'],
   ['1.7.1','23-09-2026','Tarjetas del Flujo clicables: saldo bancos (detalle por cuenta), por cobrar y por pagar (cartera completa por contraparte, período y detalle), saldo final (por período) y saldo mínimo (período del mínimo).'],
   ['1.7.0','23-09-2026','Etiquetas del flujo clicables con ventana de detalle: cada categoría (por contraparte, por período y detalle con pagar/editar y exportar a Excel), saldo inicial por cuenta, composición de totales, flujo neto y saldo final por período, y cada columna de período.'],
   ['1.6.0','23-09-2026','Dar por pagados los compromisos (fecha y cuenta de pago). Saldo bancario teórico por cuenta = último saldo real + pagos registrados. Nueva pestaña Conciliación: ingreso semanal del saldo real, diferencia contra el teórico, historial y análisis de diferencias (pendientes no marcados, coincidencias exactas, registro de documento faltante). El flujo proyectado parte del saldo teórico.'],
@@ -563,6 +564,8 @@ function viewFlujo(){
       <label>Periodicidad<select onchange="UI.flujo.gran=this.value;UI.flujo.n={dia:30,sem:13,mes:12}[this.value];saveF()">
         <option value="dia" ${F.gran==='dia'?'selected':''}>Diaria</option><option value="sem" ${F.gran==='sem'?'selected':''}>Semanal</option><option value="mes" ${F.gran==='mes'?'selected':''}>Mensual</option></select></label>
       <label>Períodos<input type="number" min="1" max="60" value="${F.n}" style="width:80px" onchange="UI.flujo.n=Math.max(1,Math.min(60,+this.value||1));saveF()"></label>
+      <span style="flex:1"></span>
+      <div class="fld"><span class="small muted" style="display:block;margin-bottom:4px">Gráfico</span><div class="seg" id="segGraf">${[['barras','Barras'],['linea','Línea']].map(([k,l])=>`<button data-g="${k}" class="${(F.graf||'barras')===k?'on':''}" onclick="setGraf('${k}')">${l}</button>`).join('')}</div></div>
     </div>
     <svg id="chart" class="chart"></svg>
   </div>
@@ -597,20 +600,38 @@ function viewResumenEmpresas(){
   return `<div class="card" style="margin-top:14px"><h2>Resumen por empresa</h2><div class="tw"><table class="cards"><thead><tr><th>Empresa</th><th class="n">Saldo teórico</th><th class="n">Por cobrar</th><th class="n">Por pagar</th><th class="n">Saldo a 30 días</th></tr></thead><tbody>${rows}</tbody></table></div>
   <p class="small muted">Los traspasos y préstamos entre empresas del holding se compensan en la vista consolidada.</p></div>`;
 }
+function setGraf(t){ UI.flujo.graf=t; ls.set('fc_flujo',{...UI.flujo}); document.querySelectorAll('#segGraf button').forEach(x=>x.classList.toggle('on',x.dataset.g===t)); drawChart(); }
 function drawChart(){
   const svg = $('#chart'); if(!svg || !_flujo) return;
-  const W = svg.clientWidth || 800, H = 190, P = {l:8,r:8,t:14,b:22};
+  const linea = UI.flujo.graf==='linea';
+  const W = svg.clientWidth || 800, H = 200, P = {l:8,r:8,t:18,b:22};
   const v = _flujo.sFin, lab = _flujo.cols.map(c=>c.label);
   const mx = Math.max(0,...v), mn = Math.min(0,...v); const rng = (mx-mn)||1;
   const y = x => P.t + (mx-x)/rng*(H-P.t-P.b);
-  const bw = (W-P.l-P.r)/v.length;
-  let s = `<line x1="${P.l}" x2="${W-P.r}" y1="${y(0)}" y2="${y(0)}" stroke="#8396a8"/>`;
-  v.forEach((val,i)=>{
-    const x = P.l + i*bw + bw*.15, w = bw*.7, y0=y(0), y1=y(val);
-    s += `<rect x="${x}" y="${Math.min(y0,y1)}" width="${w}" height="${Math.max(1,Math.abs(y1-y0))}" rx="2" fill="${val<0?'#d04343':(i===0?'#b3cde8':'#5899da')}"><title>${lab[i]}: ${fmt(val)}</title></rect>`;
-    if(v.length<=20 || i%Math.ceil(v.length/15)===0) s += `<text x="${x+w/2}" y="${H-6}" font-size="10" text-anchor="middle" fill="#556b82">${esc(lab[i])}</text>`;
-  });
-  s += `<text x="${P.l}" y="10" font-size="10" fill="#556b82">Saldo final por período · máx ${fmtK(mx)}${mn<0?' · mín '+fmtK(mn):''}</text>`;
+  const bw = (W-P.l-P.r)/v.length; const cx = i => P.l + i*bw + bw/2;
+  const tip = (i,val) => `<title>${esc(lab[i])}: ${fmt(val)} · clic para ver el período</title>`;
+  let s = '';
+  if(linea){
+    // área bajo la línea, línea, y puntos (rojos si el saldo es negativo)
+    const pts = v.map((val,i)=>`${cx(i).toFixed(1)},${y(val).toFixed(1)}`);
+    s += `<defs><linearGradient id="gA" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5899da" stop-opacity=".28"/><stop offset="1" stop-color="#5899da" stop-opacity="0"/></linearGradient>
+      <clipPath id="cPos"><rect x="0" y="0" width="${W}" height="${y(0)}"/></clipPath><clipPath id="cNeg"><rect x="0" y="${y(0)}" width="${W}" height="${H}"/></clipPath></defs>`;
+    s += `<polygon points="${cx(0).toFixed(1)},${y(0)} ${pts.join(' ')} ${cx(v.length-1).toFixed(1)},${y(0)}" fill="url(#gA)"/>`;
+    s += `<line x1="${P.l}" x2="${W-P.r}" y1="${y(0)}" y2="${y(0)}" stroke="#8396a8" stroke-dasharray="${mn<0?'4 3':'0'}"/>`;
+    s += `<polyline points="${pts.join(' ')}" fill="none" stroke="#0a6ed1" stroke-width="2.5" stroke-linejoin="round" clip-path="url(#cPos)"/>`;
+    if(mn<0) s += `<polyline points="${pts.join(' ')}" fill="none" stroke="#d04343" stroke-width="2.5" stroke-linejoin="round" clip-path="url(#cNeg)"/>`;
+    v.forEach((val,i)=>{ s += `<g style="cursor:pointer" onclick="detPeriodo(${i})"><rect x="${cx(i)-bw/2}" y="${P.t}" width="${bw}" height="${H-P.t-P.b}" fill="transparent"/>
+      <circle cx="${cx(i)}" cy="${y(val)}" r="${v.length>30?2.5:4}" fill="#fff" stroke="${val<0?'#d04343':(i===0?'#8fb6e3':'#0a6ed1')}" stroke-width="2"/>${tip(i,val)}</g>`; });
+  } else {
+    s += `<line x1="${P.l}" x2="${W-P.r}" y1="${y(0)}" y2="${y(0)}" stroke="#8396a8"/>`;
+    v.forEach((val,i)=>{
+      const x = P.l + i*bw + bw*.15, w = bw*.7, y0=y(0), y1=y(val);
+      s += `<rect style="cursor:pointer" onclick="detPeriodo(${i})" x="${x}" y="${Math.min(y0,y1)}" width="${w}" height="${Math.max(1,Math.abs(y1-y0))}" rx="2" fill="${val<0?'#d04343':(i===0?'#b3cde8':'#5899da')}">${tip(i,val)}</rect>`;
+    });
+  }
+  const paso = Math.max(1, Math.ceil(v.length / Math.max(2, Math.floor((W-P.l-P.r)/52))));
+  v.forEach((val,i)=>{ if(i%paso===0) s += `<text x="${cx(i)}" y="${H-6}" font-size="10" text-anchor="middle" fill="#556b82">${esc(lab[i])}</text>`; });
+  s += `<text x="${P.l}" y="11" font-size="10" fill="#556b82">Saldo final por período · máx ${fmtK(mx)}${mn<0?' · mín '+fmtK(mn):''}</text>`;
   svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.innerHTML = s;
 }
 addEventListener('resize', ()=>{ clearTimeout(window._rz); window._rz=setTimeout(()=>{ if(UI.tab==='flujo') drawChart(); },150); });
