@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Flujo de Caja Consolidado</title>
 <meta name="description" content="Flujo de caja multiempresa y multicuenta">
-<meta name="theme-color" content="#37474f">
+<meta name="theme-color" content="#354a5f">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -17,111 +17,190 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="config.js"></script>
 <style>
+/* ===== Estilo inspirado en SAP Fiori (Horizon / Quartz) ===== */
 :root{
-  --bg:#eceff1;--card:#fff;--ink:#263238;--muted:#607d8b;--line:#cfd8dc;
-  --brand:#37474f;--brand2:#546e7a;--in:#2e7d32;--out:#c62828;--warn:#b7791f;
-  --soft:#eef2f4;--accent:#78909c;--chart:#546e7a;--chart0:#b0bec5;
-  --row-saldo:#e8edf0;--hover:#dde5ea;--radius:10px;--shadow:0 1px 3px rgba(0,0,0,.08);
+  --bg:#f5f6f7;--card:#fff;--ink:#1d2d3e;--muted:#556b82;--line:#e5e5e5;--line2:#d9d9d9;
+  --shell:#354a5f;--shell2:#2c3e50;--brand:#0a6ed1;--brand2:#0854a0;--brand-soft:#ebf5fe;
+  --in:#107e3e;--out:#bb0000;--warn:#e9730c;--info:#0a6ed1;
+  --soft:#f5f6f7;--row-saldo:#eff4f9;--hover:#f0f5fb;--sel:#e5f0fa;
+  --radius:12px;--r-sm:8px;--r-xs:4px;
+  --shadow:0 0 .125rem rgba(34,53,72,.15),0 .125rem .5rem rgba(34,53,72,.12);
+  --shadow-h:0 0 .125rem rgba(34,53,72,.2),0 .5rem 1rem rgba(34,53,72,.18);
+  --font:"72","72full",-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
 }
 *{box-sizing:border-box}
-html,body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 var(--font)}
 button,input,select,textarea{font:inherit;color:inherit}
-header.top{position:sticky;top:0;z-index:20;background:var(--brand);color:#fff;padding:10px 16px;padding-top:calc(10px + env(safe-area-inset-top));display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-header.top h1{font-size:18px;margin:0;font-weight:700;letter-spacing:.3px;white-space:nowrap}
-header.top .ver{font-size:11px;font-weight:500;opacity:.7;margin-left:4px;letter-spacing:0}
-header.top .sp{flex:1}
-header.top select{background:#fff2;color:#fff;border:1px solid #fff5;border-radius:8px;padding:6px 8px;max-width:220px}
-header.top select option{color:#000}
-nav.tabs{display:flex;gap:4px}
-nav.tabs button{background:none;border:0;color:#fffc;padding:7px 12px;border-radius:8px;cursor:pointer}
-nav.tabs button.on{background:#fff2;color:#fff;font-weight:600}
+svg.i{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;vertical-align:-3px}
+
+/* Shell bar */
+header.shell{position:sticky;top:0;z-index:40;background:var(--shell);color:#fff;height:48px;padding:0 12px;padding-top:env(safe-area-inset-top);box-sizing:content-box;display:flex;align-items:center;gap:10px}
+header.shell .logo{width:30px;height:30px;border-radius:6px;background:linear-gradient(135deg,#0a6ed1,#5899da);display:grid;place-items:center;flex:none}
+header.shell .logo svg{width:18px;height:18px;stroke:#fff}
+header.shell h1{font-size:15px;margin:0;font-weight:700;white-space:nowrap;letter-spacing:.1px}
+header.shell .ver{font-size:11px;font-weight:400;opacity:.65;margin-left:6px}
+header.shell .sp{flex:1}
+header.shell select{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.28);border-radius:var(--r-sm);height:32px;padding:0 8px;max-width:230px;cursor:pointer}
+header.shell select:hover{background:rgba(255,255,255,.2)}
+header.shell select option{color:#000}
+header.shell .avatar{width:32px;height:32px;border-radius:50%;background:#5b738b;display:grid;place-items:center;font-size:12px;font-weight:700;flex:none;cursor:default}
+
+/* Icon tab bar */
+nav.tabs{position:sticky;top:calc(48px + env(safe-area-inset-top));z-index:35;background:#fff;box-shadow:0 1px 0 var(--line),0 2px 4px rgba(34,53,72,.06);display:flex;gap:4px;padding:0 16px;overflow-x:auto;scrollbar-width:none}
+nav.tabs::-webkit-scrollbar{display:none}
+nav.tabs button{background:none;border:0;color:var(--muted);height:44px;padding:0 12px;cursor:pointer;display:flex;align-items:center;gap:7px;border-bottom:3px solid transparent;border-top:3px solid transparent;white-space:nowrap;font-weight:400}
+nav.tabs button:hover{color:var(--brand)}
+nav.tabs button.on{color:var(--brand);border-bottom-color:var(--brand);font-weight:700}
+nav.tabs .sm{display:none}
+
+/* Dynamic page header */
+.dp-head{background:#fff;padding:14px 16px 12px;box-shadow:0 1px 0 var(--line)}
+.dp-head .in{max-width:1400px;margin:0 auto;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.dp-head h2{margin:0;font-size:20px;font-weight:700;color:var(--ink)}
+.dp-head .sub{font-size:13px;color:var(--muted);margin-top:2px}
+.dp-head .sp{flex:1}
 main{max-width:1400px;margin:0 auto;padding:16px}
-.banner{background:#fff4d6;border:1px solid #f0d58a;padding:8px 12px;border-radius:8px;margin-bottom:12px;font-size:13px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px;margin-bottom:14px}
-.card h2{font-size:15px;margin:0 0 10px}
-.row{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
-.row>label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
-input,select,textarea{border:1px solid var(--line);border-radius:8px;padding:7px 9px;background:#fff;min-width:0}
-input:focus,select:focus,textarea:focus{outline:2px solid var(--brand2);outline-offset:-1px}
-.btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:7px 12px;cursor:pointer;white-space:nowrap}
-.btn:hover{background:var(--soft)}
-.row>label.btn{display:inline-flex;flex-direction:row;align-items:center;font-size:14px;color:var(--ink)}
+
+/* Message strip */
+.banner{background:#fef7f1;border:1px solid #fcd8b6;border-left:4px solid var(--warn);padding:8px 12px;border-radius:var(--r-sm);margin-bottom:14px;font-size:13px;color:var(--ink)}
+.banner.info{background:var(--brand-soft);border-color:#bfdcf8;border-left-color:var(--brand)}
+
+/* Cards */
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;margin-bottom:16px}
+.card h2{font-size:16px;margin:0 0 12px;font-weight:700}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:end}
+.row>label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+
+/* Inputs */
+input,select,textarea{border:1px solid #8396a8;border-radius:var(--r-xs);height:36px;padding:0 10px;background:#fff;min-width:0;color:var(--ink)}
+textarea{height:auto;padding:8px 10px}
+input[type=checkbox]{height:16px;width:16px;accent-color:var(--brand);vertical-align:middle}
+input[type=color]{padding:2px;width:60px}
+input:hover,select:hover{border-color:var(--brand);background:#fafcff}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--brand);outline-offset:1px}
+input:disabled{background:var(--soft);border-color:var(--line2);color:var(--muted)}
+
+/* Buttons */
+.btn{border:1px solid #bcc3ca;background:#fff;color:var(--brand);border-radius:var(--r-sm);height:36px;padding:0 14px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:600}
+.btn:hover{background:var(--hover);border-color:var(--brand)}
+.btn:active{background:var(--brand);color:#fff}
 .btn.pri{background:var(--brand);border-color:var(--brand);color:#fff}
-.btn.pri:hover{background:var(--brand2)}
-.btn.dan{color:var(--out);border-color:#e8c3bd}
-.btn.sm{padding:4px 8px;font-size:12px}
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:14px}
-.kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px}
-.kpi .l{font-size:12px;color:var(--muted)}
-.kpi .v{font-size:20px;font-weight:700;margin-top:2px;font-variant-numeric:tabular-nums}
-.kpi .s{font-size:11px;color:var(--muted)}
+.btn.pri:hover{background:var(--brand2);border-color:var(--brand2)}
+.btn.dan{color:var(--out);border-color:#e9a3a3}
+.btn.dan:hover{background:#ffebeb;border-color:var(--out)}
+.btn.ghost{border-color:transparent;background:none}
+.btn.ghost:hover{background:var(--hover)}
+.btn.sm{height:28px;padding:0 10px;font-size:13px}
+.btn[disabled]{opacity:.45;pointer-events:none}
+.row>label.btn{display:inline-flex;flex-direction:row;align-items:center;font-size:14px;color:var(--brand)}
+
+/* KPI tiles (Generic Tile) */
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;margin-bottom:16px}
+.kpi{background:var(--card);border-radius:1rem;box-shadow:var(--shadow);padding:14px 16px;min-height:132px;display:flex;flex-direction:column;transition:box-shadow .15s}
+.kpi:hover{box-shadow:var(--shadow-h)}
+.kpi .l{font-size:14px;font-weight:700;color:var(--ink)}
+.kpi .v{font-size:26px;font-weight:300;margin-top:auto;padding-top:10px;font-variant-numeric:tabular-nums;letter-spacing:-.3px;color:var(--ink)}
+.kpi .s{font-size:12px;color:var(--muted);margin-top:4px}
 .pos{color:var(--in)}.neg{color:var(--out)}
-.tw{overflow:auto;max-width:100%;border:1px solid var(--line);border-radius:8px;background:#fff}
+.kpi .v.pos{color:var(--in)}.kpi .v.neg{color:var(--out)}
+
+/* Tables (Responsive table) */
+.tw{overflow:auto;max-width:100%;border-radius:var(--radius);background:#fff;box-shadow:var(--shadow)}
+.card .tw{box-shadow:none;border:1px solid var(--line);border-radius:var(--r-sm)}
 table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
-th,td{padding:6px 9px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
-th{background:var(--soft);font-weight:600;font-size:12px;position:sticky;top:0;z-index:1}
+th,td{padding:0 12px;height:40px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{background:#fff;font-weight:400;font-size:13px;color:var(--muted);position:sticky;top:0;z-index:1;height:40px;border-bottom:1px solid var(--line2)}
+tbody tr:hover td{background:var(--hover)}
 td.n,th.n{text-align:right}
-table.flujo td:first-child,table.flujo th:first-child{position:sticky;left:0;background:#fff;z-index:2;min-width:190px}
-table.flujo th:first-child{background:var(--soft);z-index:3}
-table.flujo tr.sec td{background:#f5f7f8;font-weight:700;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
-table.flujo tr.tot td{font-weight:700;border-top:2px solid var(--line)}
+tfoot td{font-weight:700;background:var(--soft)}
+table.flujo td:first-child,table.flujo th:first-child{position:sticky;left:0;background:#fff;z-index:2;min-width:200px;box-shadow:1px 0 0 var(--line)}
+table.flujo th:first-child{z-index:3}
+table.flujo tr.sec td{background:var(--soft);font-weight:700;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;height:32px}
+table.flujo tr.tot td{font-weight:700;border-top:1px solid var(--line2)}
 table.flujo tr.saldo td{font-weight:700;background:var(--row-saldo)}
-table.flujo tr.saldo td:first-child{background:var(--row-saldo)}
 table.flujo td.click{cursor:pointer}
-table.flujo td.click:hover{background:var(--hover)}
-tr.pagado td{color:#90a4ae;text-decoration:line-through}
-.tag{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;background:#e3e8eb;color:var(--brand)}
-.tag.cxp{background:#fbecea;color:var(--out)}.tag.cxc{background:#e7f4ec;color:var(--in)}.tag.man{background:#fff4d6;color:#8a5a00}
+td input{height:30px}
+table.flujo td.click:hover{background:var(--sel);text-decoration:underline}
+tr.pagado td{color:#8396a8;text-decoration:line-through}
+
+/* Object status (inverted) */
+.tag{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:var(--r-xs);font-size:12px;font-weight:600;background:#eff1f2;color:var(--muted);border:1px solid #d5dadd}
+.tag.cxc{background:#f5fae5;color:var(--in);border-color:#b8d9a0}
+.tag.cxp{background:#ffeaf4;color:var(--out);border-color:#f4b8b8}
+.tag.man{background:#fff3b8;color:#a45d00;border-color:#f5d174}
 .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
 .muted{color:var(--muted)}.small{font-size:12px}
-.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
-.modal-bg{position:fixed;inset:0;background:#0006;z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:4vh 12px;overflow:auto}
-.modal{background:#fff;border-radius:12px;max-width:640px;width:100%;padding:18px;box-shadow:0 10px 40px #0004}
-.modal.wide{max-width:1000px}
-.modal h3{margin:0 0 12px}
-.form{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.form label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+.grid2>.card{margin-bottom:0}
+
+/* Dialog */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:5vh 12px;overflow:auto}
+.modal{background:#fff;border-radius:var(--radius);max-width:660px;width:100%;box-shadow:0 1rem 3rem rgba(34,53,72,.35);display:flex;flex-direction:column;max-height:90vh}
+.modal.wide{max-width:1040px}
+.modal .dlg-h{padding:14px 18px;border-bottom:1px solid var(--line);flex:none}
+.modal .dlg-h h3{margin:0;font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px}
+.modal .dlg-c{padding:16px 18px;overflow:auto;flex:1}
+.modal .dlg-f{padding:10px 18px;border-top:1px solid var(--line);background:#fff;border-radius:0 0 var(--radius) var(--radius);flex:none}
+.modal .dlg-f .actions{margin:0}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}
+.form label,.form .fld{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
 .form .full{grid-column:1/-1}
-.actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
-.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#263238;color:#fff;padding:10px 16px;border-radius:8px;z-index:60;box-shadow:0 4px 12px #0004;max-width:90vw}
-.chart{width:100%;height:190px}
-.login{max-width:360px;margin:12vh auto}
-.bulk{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:8px 0}
+.actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap;align-items:center}
+.toast{position:fixed;bottom:32px;left:50%;transform:translateX(-50%);background:rgba(29,45,62,.92);color:#fff;padding:12px 18px;border-radius:var(--r-sm);z-index:80;box-shadow:0 4px 16px rgba(0,0,0,.25);max-width:90vw;font-size:14px}
+.chart{width:100%;height:200px}
+.login{max-width:380px;margin:12vh auto}
+.bulk{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:10px 0}
 .hide{display:none!important}
-.form .fld{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+
+/* Toolbars dentro de tarjetas */
+.tbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.tbar h3{margin:0;font-size:15px;font-weight:700}
+
+/* Autocomplete / auxiliar */
 .ac{position:relative}
 .ac input{width:100%}
-.ac-list{position:absolute;left:0;right:0;top:100%;margin-top:2px;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 20px #0002;max-height:260px;overflow:auto;z-index:70}
-.ac-i{padding:7px 10px;cursor:pointer;color:var(--ink);font-size:13px;display:flex;justify-content:space-between;gap:8px}
-.ac-i.on,.ac-i:hover{background:var(--soft)}
-.ac-i.new{color:var(--brand);font-weight:600;border-top:1px solid var(--line)}
+.ac-list{position:absolute;left:0;right:0;top:100%;margin-top:4px;background:#fff;border-radius:var(--r-sm);box-shadow:var(--shadow-h);max-height:260px;overflow:auto;z-index:70;padding:4px 0}
+.ac-i{padding:8px 12px;cursor:pointer;color:var(--ink);font-size:14px;display:flex;justify-content:space-between;gap:8px}
+.ac-i.on,.ac-i:hover{background:var(--sel)}
+.ac-i.new{color:var(--brand);font-weight:700;border-top:1px solid var(--line)}
 .ac-i.vacio{color:var(--muted);cursor:default}
-.docbox{grid-column:1/-1;border:1px solid var(--line);background:#f7f9fa;border-radius:8px;padding:10px;display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px}
-.docbox .sub{grid-column:1/-1;display:grid;grid-template-columns:1fr 2fr auto auto;gap:8px;align-items:end;border-top:1px dashed var(--line);padding-top:8px}
-.aux-ok{font-size:11px;color:var(--in)}
-.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff}
-.seg button{border:0;background:none;padding:7px 14px;cursor:pointer}
-.seg button.on{background:var(--brand);color:#fff}
-@media (max-width:760px){.docbox,.docbox .sub{grid-template-columns:1fr}}
+.ac-i.vacio:hover{background:none}
+.docbox{grid-column:1/-1;border:1px solid var(--line);background:var(--soft);border-radius:var(--r-sm);padding:12px;display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px}
+.docbox .sub{grid-column:1/-1;display:grid;grid-template-columns:1fr 2fr auto auto;gap:8px;align-items:end;border-top:1px dashed var(--line2);padding-top:10px}
+.aux-ok{font-size:12px;color:var(--in)}
+/* Segmented button */
+.seg{display:inline-flex;border:1px solid #bcc3ca;border-radius:var(--r-sm);overflow:hidden;background:#fff}
+.seg button{border:0;background:none;height:34px;padding:0 16px;cursor:pointer;color:var(--brand);font-weight:600}
+.seg button+button{border-left:1px solid #bcc3ca}
+.seg button.on{background:var(--brand-soft);color:var(--brand2);box-shadow:inset 0 -2px 0 var(--brand)}
+
 @media (max-width:760px){
-  header.top{padding:8px 12px;padding-top:calc(8px + env(safe-area-inset-top))}
-  header.top h1{font-size:16px}
-  header.top select{max-width:170px}
-  nav.tabs{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);justify-content:space-around;padding:4px 4px calc(4px + env(safe-area-inset-bottom));z-index:30}
-  nav.tabs button{color:var(--muted);font-size:11px;padding:6px 4px;display:flex;flex-direction:column;align-items:center;gap:1px;flex:1}
-  nav.tabs button .ic{font-size:18px}
-  nav.tabs button.on{background:var(--soft);color:var(--brand)}
-  main{padding:12px 12px 90px}
+  header.shell h1{font-size:14px}
+  header.shell select{max-width:150px}
+  header.shell .lg,nav.tabs .lg{display:none}
+  header.shell .sm,nav.tabs .sm{display:inline}
+  header.shell .avatar{display:none}
+  nav.tabs{padding:0 6px}
+  nav.tabs button{padding:0 10px}
+  .dp-head{padding:10px 12px}
+  .dp-head h2{font-size:17px}
+  main{padding:12px}
   .form{grid-template-columns:1fr}
-  .kpi .v{font-size:17px}
+  .kpis{grid-template-columns:1fr 1fr;gap:10px}
+  .kpi{min-height:112px;padding:12px}
+  .kpi .v{font-size:19px}
+  .kpi .l{font-size:13px}
   table.cards thead{display:none}
-  table.cards,table.cards tbody,table.cards tr,table.cards td{display:block;width:100%}
-  table.cards tr{border-bottom:1px solid var(--line);padding:8px 10px}
-  table.cards td{border:0;padding:1px 0;white-space:normal;text-align:left!important}
+  table.cards,table.cards tbody,table.cards tr,table.cards td,table.cards tfoot{display:block;width:100%}
+  table.cards tr{border-bottom:1px solid var(--line);padding:10px 12px}
+  table.cards td{border:0;padding:2px 0;height:auto;white-space:normal;text-align:left!important}
   table.cards td[data-l]::before{content:attr(data-l) ": ";color:var(--muted);font-size:12px}
+  .docbox,.docbox .sub{grid-template-columns:1fr}
+  .modal-bg{padding:0;align-items:stretch}
+  .modal{max-height:none;min-height:100%;border-radius:0}
+  .modal .dlg-f{border-radius:0;position:sticky;bottom:0}
 }
-@media (min-width:761px){nav.tabs button .ic,nav.tabs .sm,header.top h1 .sm{display:none}}
-@media (max-width:760px){nav.tabs .lg,header.top h1 .lg{display:none}.banner{font-size:12px;padding:6px 10px}}
+@media (min-width:761px){header.shell .sm{display:none}}
 </style>
 </head>
 <body>
@@ -133,8 +212,9 @@ tr.pagado td{color:#90a4ae;text-decoration:line-through}
    Datos: Firebase Firestore (config.js) o modo local (localStorage)
    ===================================================================== */
 const APP_NAME = 'Flujo de Caja Consolidado';
-const APP_VERSION = '1.3.0';             // sube también VERSION en sw.js al publicar
+const APP_VERSION = '1.4.0';             // sube también VERSION en sw.js al publicar
 const CHANGELOG = [
+  ['1.4.0','23-09-2026','Nueva visualización estilo SAP Fiori: barra shell, pestañas con íconos, encabezado de página, KPI en tiles, tablas y diálogos Fiori.'],
   ['1.3.0','22-09-2026','Auxiliar de clientes y proveedores (RUT validado). Cobranza clientes y Pago proveedores exigen cliente/proveedor y N° de documento con buscador dinámico por RUT o nombre. Los documentos importados alimentan el auxiliar y reemplazan los ingresados a mano con el mismo RUT y folio.'],
   ['1.2.0','22-09-2026','Nuevo nombre "Flujo de Caja Consolidado" y número de versión visible.'],
   ['1.1.0','22-09-2026','Paleta de colores azul grisáceo e ícono nuevo.'],
@@ -147,6 +227,19 @@ const CATEGORIAS = {
   ingreso:['Cobranza clientes','Crédito bancario (desembolso)','Línea de crédito (giro)','Aporte de socios','Préstamo empresa relacionada','Traspaso entre cuentas','Venta de activos','Otros ingresos'],
   egreso:['Pago proveedores','Cuota crédito bancario','Leasing','Línea de crédito (abono)','Remuneraciones','Impuestos (F29 / F22)','Imposiciones','Arriendos','Retiro de socios','Préstamo empresa relacionada','Traspaso entre cuentas','Otros egresos']
 };
+
+/* ---------- íconos (trazos simples estilo Fiori) ---------- */
+const ICONS = {
+  flujo:'<path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 6-7"/>',
+  mov:'<path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/>',
+  imp:'<path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 19h16"/>',
+  ctas:'<path d="M3 10h18L12 4 3 10z"/><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"/>',
+  ajustes:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+  add:'<path d="M12 5v14M5 12h14"/>',
+  xls:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M9 13l6 6M15 13l-6 6"/>',
+  logo:'<path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/>',
+};
+const ico = k => `<svg class="i" viewBox="0 0 24 24">${ICONS[k]||''}</svg>`;
 
 /* ---------- utilidades ---------- */
 const $ = s => document.querySelector(s);
@@ -318,24 +411,41 @@ function render(){
   const app = $('#app');
   if(Store.mode==='firebase' && !Store.user){ app.innerHTML = viewLogin(); return; }
   if(UI.emp!=='*' && !empresa(UI.emp)) UI.emp='*';
-  const tabs = [['flujo','📈','Flujo'],['mov','📋','Movimientos'],['imp','📥','Importar'],['ctas','🏦','Empresas y cuentas'],['ajustes','⚙️','Ajustes']];
+  const tabs = [['flujo','Flujo de caja','Flujo'],['mov','Movimientos','Movimientos'],['imp','Importar','Importar'],['ctas','Empresas y cuentas','Cuentas'],['ajustes','Ajustes','Ajustes']];
+  const ini = (Store.user?.email||'').slice(0,2).toUpperCase();
+  const hd = pageHead();
   app.innerHTML = `
-  <header class="top">
-    <h1><span class="lg">Flujo de Caja Consolidado</span><span class="sm">Flujo Consolidado</span> <span class="ver" title="Versión de la app">v${APP_VERSION}</span></h1>
+  <header class="shell">
+    <div class="logo"><svg class="i" viewBox="0 0 24 24">${ICONS.logo}</svg></div>
+    <h1><span class="lg">Flujo de Caja Consolidado</span><span class="sm">Flujo Consolidado</span><span class="ver" title="Versión de la app">v${APP_VERSION}</span></h1>
+    <span class="sp"></span>
     <select id="selEmp" onchange="setEmp(this.value)" title="Empresa">
       <option value="*">Holding (todas)</option>
       ${E().map(e=>`<option value="${e.id}" ${UI.emp===e.id?'selected':''}>${esc(e.nombre)}</option>`).join('')}
     </select>
-    <span class="sp"></span>
-    <nav class="tabs">${tabs.map(([k,ic,l])=>`<button class="${UI.tab===k?'on':''}" onclick="setTab('${k}')"><span class="ic">${ic}</span>${k==='ctas'?'<span class="lg">Empresas y cuentas</span><span class="sm">Cuentas</span>':l}</button>`).join('')}</nav>
+    ${ini?`<div class="avatar" title="${esc(Store.user.email)}">${esc(ini)}</div>`:''}
   </header>
+  <nav class="tabs">${tabs.map(([k,l,c])=>`<button class="${UI.tab===k?'on':''}" onclick="setTab('${k}')">${ico(k)}<span class="lg">${l}</span><span class="sm">${c}</span></button>`).join('')}</nav>
+  <div class="dp-head"><div class="in"><div><h2>${hd.t}</h2><div class="sub">${hd.s}</div></div><span class="sp"></span>${hd.a||''}</div></div>
   <main>
-    ${Store.mode==='local' ? `<div class="banner">Modo local: los datos se guardan solo en este navegador. Configura Firebase en <b>config.js</b> para sincronizar PC y celular.</div>`:''}
+    ${Store.mode==='local' ? `<div class="banner info">Modo local: los datos se guardan solo en este navegador. Configura Firebase en <b>config.js</b> para sincronizar PC y celular.</div>`:''}
     ${!Store.data.empresas.length && UI.tab!=='ajustes' ? viewBienvenida() : ({flujo:viewFlujo, mov:viewMov, imp:viewImp, ctas:viewCtas, ajustes:viewAjustes}[UI.tab]||viewFlujo)()}
   </main>`;
   afterRender();
 }
 function afterRender(){ if(UI.tab==='flujo') drawChart(); }
+function pageHead(){
+  const emp = UI.emp==='*' ? 'Holding consolidado' : (empresa(UI.emp)?.nombre||'');
+  const hay = Store.data.empresas.length;
+  const H = {
+    flujo:{t:'Flujo de caja', s:`${esc(emp)} · al ${fDate(today())}`, a: hay?`<button class="btn" onclick="exportFlujo()">${ico('xls')}Exportar</button><button class="btn pri" onclick="nuevoMov()">${ico('add')}Movimiento</button>`:''},
+    mov:{t:'Movimientos', s:`${esc(emp)} · documentos y movimientos manuales`, a: hay?`<button class="btn pri" onclick="nuevoMov()">${ico('add')}Movimiento manual</button>`:''},
+    imp:{t:'Importar documentos', s:'Por pagar y por cobrar desde Excel'},
+    ctas:{t:'Empresas y cuentas', s:'Saldos bancarios, cuentas corrientes y auxiliar de clientes y proveedores'},
+    ajustes:{t:'Ajustes', s:`Versión ${APP_VERSION} · ${Store.mode==='firebase'?'Firebase':'modo local'}`},
+  };
+  return H[UI.tab] || H.flujo;
+}
 
 function viewLogin(){
   return `<div class="login card"><h2>${APP_NAME} · Ingresar</h2>
@@ -356,7 +466,7 @@ async function doLogin(ev){
 function viewBienvenida(){
   return `<div class="card"><h2>Comencemos</h2>
     <p>Crea tus empresas y sus cuentas corrientes con el saldo actual. Luego importa el Excel de documentos por pagar y por cobrar, y agrega movimientos manuales (créditos, leasing, remuneraciones, etc.).</p>
-    <div class="row"><button class="btn pri" onclick="editEmpresa()">+ Crear empresa</button>
+    <div class="row"><button class="btn pri" onclick="editEmpresa()">${ico('add')}Crear empresa</button>
     ${Store.mode==='local'?'<button class="btn" onclick="cargarDemo()">Cargar datos de ejemplo</button>':''}</div></div>`;
 }
 
@@ -434,9 +544,6 @@ function viewFlujo(){
       <label>Periodicidad<select onchange="UI.flujo.gran=this.value;UI.flujo.n={dia:30,sem:13,mes:12}[this.value];saveF()">
         <option value="dia" ${F.gran==='dia'?'selected':''}>Diaria</option><option value="sem" ${F.gran==='sem'?'selected':''}>Semanal</option><option value="mes" ${F.gran==='mes'?'selected':''}>Mensual</option></select></label>
       <label>Períodos<input type="number" min="1" max="60" value="${F.n}" style="width:80px" onchange="UI.flujo.n=Math.max(1,Math.min(60,+this.value||1));saveF()"></label>
-      <span style="flex:1"></span>
-      <button class="btn" onclick="nuevoMov()">+ Movimiento</button>
-      <button class="btn" onclick="exportFlujo()">Exportar Excel</button>
     </div>
     <svg id="chart" class="chart"></svg>
   </div>
@@ -478,13 +585,13 @@ function drawChart(){
   const mx = Math.max(0,...v), mn = Math.min(0,...v); const rng = (mx-mn)||1;
   const y = x => P.t + (mx-x)/rng*(H-P.t-P.b);
   const bw = (W-P.l-P.r)/v.length;
-  let s = `<line x1="${P.l}" x2="${W-P.r}" y1="${y(0)}" y2="${y(0)}" stroke="#b0bec5"/>`;
+  let s = `<line x1="${P.l}" x2="${W-P.r}" y1="${y(0)}" y2="${y(0)}" stroke="#8396a8"/>`;
   v.forEach((val,i)=>{
     const x = P.l + i*bw + bw*.15, w = bw*.7, y0=y(0), y1=y(val);
-    s += `<rect x="${x}" y="${Math.min(y0,y1)}" width="${w}" height="${Math.max(1,Math.abs(y1-y0))}" rx="2" fill="${val<0?'#c9594a':(i===0?'#b0bec5':'#546e7a')}"><title>${lab[i]}: ${fmt(val)}</title></rect>`;
-    if(v.length<=20 || i%Math.ceil(v.length/15)===0) s += `<text x="${x+w/2}" y="${H-6}" font-size="10" text-anchor="middle" fill="#607d8b">${esc(lab[i])}</text>`;
+    s += `<rect x="${x}" y="${Math.min(y0,y1)}" width="${w}" height="${Math.max(1,Math.abs(y1-y0))}" rx="2" fill="${val<0?'#d04343':(i===0?'#b3cde8':'#5899da')}"><title>${lab[i]}: ${fmt(val)}</title></rect>`;
+    if(v.length<=20 || i%Math.ceil(v.length/15)===0) s += `<text x="${x+w/2}" y="${H-6}" font-size="10" text-anchor="middle" fill="#556b82">${esc(lab[i])}</text>`;
   });
-  s += `<text x="${P.l}" y="10" font-size="10" fill="#607d8b">Saldo final por período · máx ${fmtK(mx)}${mn<0?' · mín '+fmtK(mn):''}</text>`;
+  s += `<text x="${P.l}" y="10" font-size="10" fill="#556b82">Saldo final por período · máx ${fmtK(mx)}${mn<0?' · mín '+fmtK(mn):''}</text>`;
   svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.innerHTML = s;
 }
 addEventListener('resize', ()=>{ clearTimeout(window._rz); window._rz=setTimeout(()=>{ if(UI.tab==='flujo') drawChart(); },150); });
@@ -551,8 +658,6 @@ function viewMov(){
       <label>Estado<select onchange="UI.mov.estado=this.value;render()">${[['pend','Pendientes'],['pag','Pagados'],['*','Todos']].map(([k,l])=>`<option value="${k}" ${f.estado===k?'selected':''}>${l}</option>`).join('')}</select></label>
       <label>Desde<input type="date" value="${f.desde}" onchange="UI.mov.desde=this.value;render()"></label>
       <label>Hasta<input type="date" value="${f.hasta}" onchange="UI.mov.hasta=this.value;render()"></label>
-      <span style="flex:1"></span>
-      <button class="btn pri" onclick="nuevoMov()">+ Movimiento manual</button>
     </div>
     <div class="bulk">
       <span class="small muted">${ms.length} movimientos · neto <b class="${tot<0?'neg':'pos'}">${fmt(tot)}</b>${n?` · <b>${n} seleccionados</b>`:''}</span>
@@ -907,7 +1012,7 @@ function viewCtas(){
 }
 function viewCuentas(){
   const emps = UI.emp==='*'? E() : [empresa(UI.emp)];
-  return `<div class="row" style="margin-bottom:12px"><button class="btn pri" onclick="editEmpresa()">+ Empresa</button><span class="small muted">Actualiza los saldos con la cartola del día. El flujo parte desde estos saldos.</span></div>
+  return `<div class="row" style="margin-bottom:12px"><button class="btn pri" onclick="editEmpresa()">${ico('add')}Empresa</button><span class="small muted">Actualiza los saldos con la cartola del día. El flujo parte desde estos saldos.</span></div>
   ${emps.map(e => { const cs = cuentasDe(e.id); const tot = cs.reduce((s,c)=>s+(+c.saldo||0),0);
     return `<div class="card"><div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px">
       <h2 style="margin:0"><span class="dot" style="background:${esc(e.color||'#888')}"></span>${esc(e.nombre)} <span class="small muted">${esc(e.rut||'')}</span></h2>
@@ -931,7 +1036,7 @@ function viewAux(){
       <label>Buscar<input id="axQ" value="${esc(f.q)}" placeholder="RUT o nombre…" oninput="UI.aux.q=this.value;debAux()"></label>
       <label>Tipo<select onchange="UI.aux.tipo=this.value;render()">${[['*','Todos'],['cliente','Clientes'],['proveedor','Proveedores']].map(([k,l])=>`<option value="${k}" ${f.tipo===k?'selected':''}>${l}</option>`).join('')}</select></label>
       <span style="flex:1"></span>
-      <button class="btn pri" onclick="editAux()">+ Nuevo</button>
+      <button class="btn pri" onclick="editAux()">${ico('add')}Nuevo</button>
       <label class="btn">Importar Excel<input type="file" class="hide" accept=".xlsx,.xls,.csv" onchange="auxImportExcel(this.files[0])"></label>
       <button class="btn" onclick="auxDesdeMovs()" title="Crea el auxiliar a partir de los documentos ya cargados">Generar desde documentos</button>
     </div>
@@ -1111,7 +1216,10 @@ async function cargarDemo(){
 }
 
 /* ---------- modal ---------- */
-function modal(html, wide){ closeModal(); const d=document.createElement('div'); d.className='modal-bg'; d.id='mdl'; d.innerHTML=`<div class="modal ${wide?'wide':''}">${html}</div>`; d.addEventListener('mousedown',e=>{ if(e.target===d) closeModal(); }); document.body.appendChild(d); }
+function modal(html, wide){ closeModal(); const d=document.createElement('div'); d.className='modal-bg'; d.id='mdl'; d.innerHTML=`<div class="modal ${wide?'wide':''}"><div class="dlg-c">${html}</div></div>`;
+  const m = d.firstElementChild, c = m.firstElementChild;
+  const h = c.querySelector(':scope > h3'); if(h){ const hh=document.createElement('div'); hh.className='dlg-h'; hh.appendChild(h); m.insertBefore(hh,c); }
+  const acts = [...c.querySelectorAll(':scope > .actions')].pop(); if(acts){ const ff=document.createElement('div'); ff.className='dlg-f'; ff.appendChild(acts); m.appendChild(ff); } d.addEventListener('mousedown',e=>{ if(e.target===d) closeModal(); }); document.body.appendChild(d); }
 function closeModal(){ $('#mdl')?.remove(); }
 addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
 

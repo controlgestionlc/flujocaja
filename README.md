@@ -54,4 +54,4 @@ Actualizar saldos bancarios › importar CxP y CxC del ERP › marcar pagados lo
 La versión se ve junto al nombre en la barra superior y en Ajustes (con el historial de cambios).
 Al publicar una versión nueva se actualizan juntos `APP_VERSION` en `index.html` y `VERSION` en `sw.js` (ej. `1.2.0` / `fcc-1.2.0`); así los equipos instalados descargan el cambio. En Ajustes › *Buscar actualización* se fuerza la recarga.
 
-Versión actual: **1.3.0**
+Versión actual: **1.4.0**
