@@ -102,9 +102,9 @@ input:disabled{background:var(--soft);border-color:var(--line2);color:var(--mute
 .kpi.clk::after{content:"›";position:absolute;right:14px;top:10px;font-size:20px;color:var(--brand);opacity:.5}
 .kpi.clk:hover{outline:2px solid var(--brand);outline-offset:-2px}
 .kpi.clk:hover::after{opacity:1}
-.kpi .l{font-size:14px;font-weight:700;color:var(--ink)}
+.kpi .l{font-size:14px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:14px}
 .kpi .v{font-size:26px;font-weight:300;margin-top:auto;padding-top:10px;font-variant-numeric:tabular-nums;letter-spacing:-.3px;color:var(--ink)}
-.kpi .s{font-size:12px;color:var(--muted);margin-top:4px}
+.kpi .s{font-size:12px;line-height:1.4;color:var(--muted);margin-top:4px;min-height:2.8em} /* reserva 2 líneas: el número queda alineado entre tarjetas */
 .pos{color:var(--in)}.neg{color:var(--out)}
 .kpi .v.pos{color:var(--in)}.kpi .v.neg{color:var(--out)}
 
@@ -224,8 +224,9 @@ tr.pagado td[data-l="Monto"],tr.pagado td[data-l="Contraparte"]{text-decoration:
    Datos: Firebase Firestore (config.js) o modo local (localStorage)
    ===================================================================== */
 const APP_NAME = 'Flujo de Caja Consolidado';
-const APP_VERSION = '1.8.1';             // sube también VERSION en sw.js al publicar
+const APP_VERSION = '1.8.2';             // sube también VERSION en sw.js al publicar
 const CHANGELOG = [
+  ['1.8.2','23-09-2026','Tarjetas KPI alineadas: el monto queda a la misma altura en todas, sin importar el largo del texto inferior.'],
   ['1.8.1','23-09-2026','La app siempre abre en Flujo de caja. Ajustes queda solo con Respaldo y Limpieza; la versión e historial se ven al hacer clic en el número de versión y la sesión se cierra desde el círculo con tus iniciales.'],
   ['1.8.0','23-09-2026','Gráfico del flujo con opción Barras o Línea (se recuerda la elección). Clic en una barra o punto abre el detalle del período.'],
   ['1.7.1','23-09-2026','Tarjetas del Flujo clicables: saldo bancos (detalle por cuenta), por cobrar y por pagar (cartera completa por contraparte, período y detalle), saldo final (por período) y saldo mínimo (período del mínimo).'],

@@ -56,4 +56,4 @@ Importar el REGISTRO FLUJO CAJA › dar por pagados los compromisos que pasaron 
 La versión se ve junto al nombre en la barra superior; al hacer clic se abre el historial de cambios y el botón *Buscar actualización*. La sesión se cierra desde el círculo con las iniciales del usuario. Ajustes contiene solo Respaldo y Limpieza, y la app siempre abre en Flujo de caja.
 Al publicar una versión nueva se actualizan juntos `APP_VERSION` en `index.html` y `VERSION` en `sw.js` (ej. `1.2.0` / `fcc-1.2.0`); así los equipos instalados descargan el cambio.
 
-Versión actual: **1.8.1**
+Versión actual: **1.8.2**
