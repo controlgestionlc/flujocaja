@@ -32,7 +32,7 @@ App web instalable (PWA) para PC y celular. Se aloja en GitHub Pages y guarda lo
 - **Android (Chrome):** menú ⋮ › Instalar app.
 - **iPhone (Safari):** Compartir › Agregar a pantalla de inicio.
 
-> Sin `config.js` configurado la app funciona en **modo local** (datos solo en ese navegador), útil para probar. En Ajustes hay datos de ejemplo y respaldo JSON para migrar luego a Firebase.
+> Sin `config.js` configurado la app funciona en **modo local** (datos solo en ese navegador), útil para probar. En la pantalla de bienvenida hay datos de ejemplo, y en Ajustes el respaldo JSON para migrar luego a Firebase.
 
 ## Uso
 
@@ -53,7 +53,7 @@ App web instalable (PWA) para PC y celular. Se aloja en GitHub Pages y guarda lo
 Importar el REGISTRO FLUJO CAJA › dar por pagados los compromisos que pasaron por el banco › ingresar el saldo real de cada cuenta en Conciliación › revisar diferencias › revisar el flujo.
 
 ## Versiones
-La versión se ve junto al nombre en la barra superior y en Ajustes (con el historial de cambios).
-Al publicar una versión nueva se actualizan juntos `APP_VERSION` en `index.html` y `VERSION` en `sw.js` (ej. `1.2.0` / `fcc-1.2.0`); así los equipos instalados descargan el cambio. En Ajustes › *Buscar actualización* se fuerza la recarga.
+La versión se ve junto al nombre en la barra superior; al hacer clic se abre el historial de cambios y el botón *Buscar actualización*. La sesión se cierra desde el círculo con las iniciales del usuario. Ajustes contiene solo Respaldo y Limpieza, y la app siempre abre en Flujo de caja.
+Al publicar una versión nueva se actualizan juntos `APP_VERSION` en `index.html` y `VERSION` en `sw.js` (ej. `1.2.0` / `fcc-1.2.0`); así los equipos instalados descargan el cambio.
 
-Versión actual: **1.8.0**
+Versión actual: **1.8.1**

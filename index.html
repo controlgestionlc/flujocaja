@@ -224,8 +224,9 @@ tr.pagado td[data-l="Monto"],tr.pagado td[data-l="Contraparte"]{text-decoration:
    Datos: Firebase Firestore (config.js) o modo local (localStorage)
    ===================================================================== */
 const APP_NAME = 'Flujo de Caja Consolidado';
-const APP_VERSION = '1.8.0';             // sube también VERSION en sw.js al publicar
+const APP_VERSION = '1.8.1';             // sube también VERSION en sw.js al publicar
 const CHANGELOG = [
+  ['1.8.1','23-09-2026','La app siempre abre en Flujo de caja. Ajustes queda solo con Respaldo y Limpieza; la versión e historial se ven al hacer clic en el número de versión y la sesión se cierra desde el círculo con tus iniciales.'],
   ['1.8.0','23-09-2026','Gráfico del flujo con opción Barras o Línea (se recuerda la elección). Clic en una barra o punto abre el detalle del período.'],
   ['1.7.1','23-09-2026','Tarjetas del Flujo clicables: saldo bancos (detalle por cuenta), por cobrar y por pagar (cartera completa por contraparte, período y detalle), saldo final (por período) y saldo mínimo (período del mínimo).'],
   ['1.7.0','23-09-2026','Etiquetas del flujo clicables con ventana de detalle: cada categoría (por contraparte, por período y detalle con pagar/editar y exportar a Excel), saldo inicial por cuenta, composición de totales, flujo neto y saldo final por período, y cada columna de período.'],
@@ -412,7 +413,7 @@ async function upsertAux(lista){
    ESTADO DE UI
    ===================================================================== */
 const UI = {
-  tab: ls.get('fc_tab','flujo'),
+  tab: 'flujo',                       // siempre abre en Flujo de caja
   emp: ls.get('fc_emp','*'),
   flujo: ls.get('fc_flujo', {cta:'*', gran:'sem', n:13}),
   mov: {cta:'*', origen:'*', estado:'pend', q:'', desde:'', hasta:'', sel:new Set()},
@@ -435,13 +436,13 @@ function render(){
   app.innerHTML = `
   <header class="shell">
     <div class="logo"><svg class="i" viewBox="0 0 24 24">${ICONS.logo}</svg></div>
-    <h1><span class="lg">Flujo de Caja Consolidado</span><span class="sm">Flujo Consolidado</span><span class="ver" title="Versión de la app">v${APP_VERSION}</span></h1>
+    <h1><span class="lg">Flujo de Caja Consolidado</span><span class="sm">Flujo Consolidado</span><span class="ver" title="Versión e historial de cambios" style="cursor:pointer" onclick="verVersion()">v${APP_VERSION}</span></h1>
     <span class="sp"></span>
     <select id="selEmp" onchange="setEmp(this.value)" title="Empresa">
       <option value="*">Holding (todas)</option>
       ${E().map(e=>`<option value="${e.id}" ${UI.emp===e.id?'selected':''}>${esc(e.nombre)}</option>`).join('')}
     </select>
-    ${ini?`<div class="avatar" title="${esc(Store.user.email)}">${esc(ini)}</div>`:''}
+    ${ini?`<div class="avatar" title="${esc(Store.user.email)}" style="cursor:pointer" onclick="menuUsuario()">${esc(ini)}</div>`:''}
   </header>
   <nav class="tabs">${tabs.map(([k,l,c])=>`<button class="${UI.tab===k?'on':''}" onclick="setTab('${k}')">${ico(k)}<span class="lg">${l}</span><span class="sm">${c}</span></button>`).join('')}</nav>
   <div class="dp-head"><div class="in"><div><h2>${hd.t}</h2><div class="sub">${hd.s}</div></div><span class="sp"></span>${hd.a||''}</div></div>
@@ -461,7 +462,7 @@ function pageHead(){
     imp:{t:'Importar documentos', s:'Por pagar y por cobrar desde Excel'},
     conc:{t:'Conciliación bancaria', s:`${esc(emp)} · saldo teórico vs saldo real semanal`},
     ctas:{t:'Empresas y cuentas', s:'Saldos bancarios, cuentas corrientes y auxiliar de clientes y proveedores'},
-    ajustes:{t:'Ajustes', s:`Versión ${APP_VERSION} · ${Store.mode==='firebase'?'Firebase':'modo local'}`},
+    ajustes:{t:'Ajustes', s:'Respaldo y limpieza de datos'},
   };
   return H[UI.tab] || H.flujo;
 }
@@ -1541,27 +1542,28 @@ async function borrarCuenta(id){
 function viewAjustes(){
   const nPag = Store.data.movimientos.filter(m=>m.estado==='pagado').length;
   return `<div class="grid2">
-  <div class="card"><h2>Conexión</h2>
-    ${Store.mode==='firebase'?`<p>Firebase · proyecto <b>${esc(window.FLUXCAJA_FIREBASE.projectId)}</b><br>Usuario: <b>${esc(Store.user?.email)}</b></p><button class="btn" onclick="firebase.auth().signOut()">Cerrar sesión</button>`
-      :`<p>Modo local (sin sincronización). Para sincronizar entre equipos, completa <b>config.js</b> con la configuración de tu proyecto Firebase y vuelve a publicar.</p>`}
-    <p class="small muted">${Store.data.empresas.length} empresas · ${Store.data.cuentas.length} cuentas · ${Store.data.movimientos.length} movimientos</p>
-  </div>
   <div class="card"><h2>Respaldo</h2>
     <p class="small muted">Descarga todos los datos en JSON o restáuralos (útil para migrar de modo local a Firebase).</p>
+    <p class="small muted">${Store.data.empresas.length} empresas · ${Store.data.cuentas.length} cuentas · ${Store.data.movimientos.length} movimientos · ${Store.data.saldos.length} saldos reales</p>
     <div class="row"><button class="btn" onclick="exportJSON()">Descargar respaldo</button>
     <label class="btn">Restaurar respaldo<input type="file" accept=".json" class="hide" onchange="importJSON(this.files[0])"></label></div>
   </div>
   <div class="card"><h2>Limpieza</h2>
-    <p class="small muted">${nPag} movimientos pagados guardados como historial.</p>
+    <p class="small muted">${nPag} movimientos pagados guardados como historial. Ojo: los pagos se usan para calcular el saldo teórico; elimina solo períodos ya conciliados.</p>
     <div class="row"><label>Eliminar pagados con fecha anterior a<input type="date" id="lmF" value="${addMonths(today(),-6)}"></label><button class="btn dan" onclick="limpiar()">Eliminar</button></div>
   </div>
-  ${Store.mode==='local'?`<div class="card"><h2>Datos de ejemplo</h2><div class="row"><button class="btn" onclick="cargarDemo()">Cargar ejemplo</button><button class="btn dan" onclick="if(confirm('¿Borrar todos los datos locales?')){COLS.forEach(c=>Store.data[c]=[]);Store.saveLocal();render();}">Borrar todo</button></div></div>`:''}
-  <div class="card"><h2>Versión ${APP_VERSION}</h2>
-    <div class="small">${CHANGELOG.map(([v,f,t])=>`<p style="margin:4px 0"><b>${v}</b> <span class="muted">${f}</span><br>${esc(t)}</p>`).join('')}</div>
-    <button class="btn sm" onclick="actualizarApp()">Buscar actualización</button></div>
-  <div class="card"><h2>Instalar</h2><p class="small">En PC (Chrome/Edge): icono de instalar en la barra de direcciones. En Android: menú ⋮ › Instalar app. En iPhone (Safari): Compartir › Agregar a pantalla de inicio.</p>
-  ${window._bip?'<button class="btn pri" onclick="_bip.prompt()">Instalar app</button>':''}</div>
   </div>`;
+}
+/* versión, historial y sesión: accesibles desde la barra superior */
+function verVersion(){
+  modal(`<h3>Flujo de Caja Consolidado · versión ${APP_VERSION}</h3>
+    <p class="small muted">${Store.mode==='firebase'?`Conectado a Firebase (${esc(window.FLUXCAJA_FIREBASE.projectId)})`:'Modo local: datos solo en este navegador'}</p>
+    <div class="small">${CHANGELOG.map(([v,f,t])=>`<p style="margin:6px 0"><b>${v}</b> <span class="muted">${f}</span><br>${esc(t)}</p>`).join('')}</div>
+    <div class="actions">${window._bip?'<button class="btn" onclick="_bip.prompt()">Instalar app</button>':''}<button class="btn" onclick="actualizarApp()">Buscar actualización</button><button class="btn pri" onclick="closeModal()">Cerrar</button></div>`);
+}
+function menuUsuario(){
+  modal(`<h3>Sesión</h3><p>Usuario: <b>${esc(Store.user?.email||'')}</b></p>
+    <div class="actions"><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn dan" onclick="closeModal();firebase.auth().signOut()">Cerrar sesión</button></div>`);
 }
 function exportJSON(){
   const blob = new Blob([JSON.stringify({app:'fluxcaja', v:1, fecha:today(), data:Store.data},null,1)], {type:'application/json'});
