@@ -10,7 +10,7 @@ App web instalable (PWA) para PC y celular. Se aloja en GitHub Pages y guarda lo
 | `config.js` | Configuración de Firebase (lo único que se edita) |
 | `manifest.webmanifest`, `sw.js`, `icons/` | Hacen la app instalable y usable sin conexión |
 | `firestore.rules` | Reglas de seguridad para pegar en Firebase |
-| `plantilla_documentos.xlsx` | Plantilla de importación si no se usa el export del ERP |
+| `plantilla_registro_flujo_caja.xlsx` | Plantilla del formato de carga REGISTRO FLUJO CAJA |
 
 ## Puesta en marcha
 
@@ -37,10 +37,10 @@ App web instalable (PWA) para PC y celular. Se aloja en GitHub Pages y guarda lo
 ## Uso
 
 1. **Empresas y cuentas:** crea cada empresa, sus cuentas corrientes y marca una como *por defecto*. Actualiza el saldo con la cartola: el flujo parte de ese saldo.
-2. **Importar:** elige empresa y tipo (por pagar / por cobrar), sube el Excel y revisa el mapeo de columnas (se recuerda para la próxima vez).
-   - Cada documento se identifica por empresa + RUT + tipo + folio, así que reimportar **actualiza** y no duplica.
-   - Los que ya no vienen en el archivo se pueden marcar como pagados automáticamente (casilla activa por defecto).
-   - Si el Excel trae una columna de cuenta bancaria (N° o alias), se asigna esa cuenta; si no, la cuenta por defecto.
+2. **Importar:** elige la empresa y sube el Excel con el formato **REGISTRO FLUJO CAJA**: `TIPO · DOCUMENTO · NUMERO DOC · FECHA EMISION · VENCIMIENTO · RUT · AUXILIAR · IMPORTE A PAGAR`. Un mismo archivo trae ingresos y egresos.
+   - FACTURA, BOLETA y NOTAS quedan como documentos por cobrar o por pagar; REMUNERACIONES, IMPOSICIONES, IMPUESTOS, LEASING, etc. quedan en su categoría.
+   - **No se duplican datos:** antes de cargar se valida fila por fila. Se omiten los documentos ya ingresados (mismo RUT + documento + número, cargados antes o a mano), los movimientos ya existentes (misma categoría + RUT + vencimiento) y las filas repetidas dentro del archivo. Las filas sin importe o fecha se informan como error.
+   - Si un documento ya ingresado viene con otro importe o vencimiento, se muestra la diferencia y puedes elegir actualizarlo (sin crear otro registro).
 3. **Clientes y proveedores (auxiliar):** en *Empresas y cuentas › Clientes y proveedores*. Se llena solo al importar documentos, con *Generar desde documentos*, importando un Excel con RUT y nombre, o creando registros a mano (el RUT se valida con dígito verificador).
 4. **Movimientos manuales:** al elegir *Cobranza clientes* o *Pago proveedores* la app exige el cliente o proveedor (buscador dinámico por RUT o nombre, con opción de crearlo ahí mismo) y el N° de documento. Si después ese documento llega en el Excel, el importado reemplaza al manual y conserva su cuenta y fecha reprogramada.
 5. **Otros movimientos manuales:** créditos, leasing, remuneraciones, impuestos, etc. Con *Repetir N cuotas* se genera la serie completa (mensual, semanal, quincenal, trimestral o anual). *Traspaso* crea el egreso y el ingreso en ambas cuentas; si son empresas distintas queda como préstamo entre relacionadas y se compensa en el consolidado.
@@ -54,4 +54,4 @@ Actualizar saldos bancarios › importar CxP y CxC del ERP › marcar pagados lo
 La versión se ve junto al nombre en la barra superior y en Ajustes (con el historial de cambios).
 Al publicar una versión nueva se actualizan juntos `APP_VERSION` en `index.html` y `VERSION` en `sw.js` (ej. `1.2.0` / `fcc-1.2.0`); así los equipos instalados descargan el cambio. En Ajustes › *Buscar actualización* se fuerza la recarga.
 
-Versión actual: **1.4.0**
+Versión actual: **1.5.0**

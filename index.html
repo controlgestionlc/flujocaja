@@ -127,6 +127,7 @@ tr.pagado td{color:#8396a8;text-decoration:line-through}
 .tag{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:var(--r-xs);font-size:12px;font-weight:600;background:#eff1f2;color:var(--muted);border:1px solid #d5dadd}
 .tag.cxc{background:#f5fae5;color:var(--in);border-color:#b8d9a0}
 .tag.cxp{background:#ffeaf4;color:var(--out);border-color:#f4b8b8}
+.tag.imp{background:#eaf3fd;color:#0854a0;border-color:#b8d4f4}
 .tag.man{background:#fff3b8;color:#a45d00;border-color:#f5d174}
 .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
 .muted{color:var(--muted)}.small{font-size:12px}
@@ -212,8 +213,9 @@ tr.pagado td{color:#8396a8;text-decoration:line-through}
    Datos: Firebase Firestore (config.js) o modo local (localStorage)
    ===================================================================== */
 const APP_NAME = 'Flujo de Caja Consolidado';
-const APP_VERSION = '1.4.0';             // sube también VERSION en sw.js al publicar
+const APP_VERSION = '1.5.0';             // sube también VERSION en sw.js al publicar
 const CHANGELOG = [
+  ['1.5.0','23-09-2026','Importación con el formato REGISTRO FLUJO CAJA (TIPO, DOCUMENTO, NUMERO DOC, FECHA EMISION, VENCIMIENTO, RUT, AUXILIAR, IMPORTE A PAGAR) en un solo archivo de ingresos y egresos. Validación anti-duplicados: omite lo ya ingresado (importado o manual) y los repetidos dentro del archivo; detalle fila por fila antes de cargar. Remuneraciones, imposiciones, impuestos, leasing, etc. se cargan en su categoría. El ingreso manual bloquea documentos duplicados.'],
   ['1.4.0','23-09-2026','Nueva visualización estilo SAP Fiori: barra shell, pestañas con íconos, encabezado de página, KPI en tiles, tablas y diálogos Fiori.'],
   ['1.3.0','22-09-2026','Auxiliar de clientes y proveedores (RUT validado). Cobranza clientes y Pago proveedores exigen cliente/proveedor y N° de documento con buscador dinámico por RUT o nombre. Los documentos importados alimentan el auxiliar y reemplazan los ingresados a mano con el mismo RUT y folio.'],
   ['1.2.0','22-09-2026','Nuevo nombre "Flujo de Caja Consolidado" y número de versión visible.'],
@@ -635,7 +637,7 @@ function tablaMov(ms, selectable){
       <td data-l="Fecha" class="${venc?'neg':''}">${fDate(fEf(m))}${m.fechaProg && m.fechaProg!==m.fecha?` <span class="small muted" title="Vencimiento original">(${fDate(m.fecha)})</span>`:''}</td>
       ${UI.emp==='*'?`<td data-l="Empresa"><span class="dot" style="background:${esc(e?.color||'#888')}"></span>${esc(e?.nombre||'?')}</td>`:''}
       <td data-l="Cuenta">${esc(cuentaLabel(cuenta(m.cuentaId)))}</td>
-      <td data-l="Origen"><span class="tag ${m.origen}">${{cxc:'CxC',cxp:'CxP',manual:'Manual'}[m.origen]||m.origen}</span></td>
+      <td data-l="Origen"><span class="tag ${m.origen}">${ORIGEN_LBL[m.origen]||m.origen}</span></td>
       <td data-l="Categoría">${esc(m.categoria)}</td>
       <td data-l="Contraparte" style="white-space:normal;min-width:160px">${esc(m.contraparte||'')}${m.rut?` <span class="small muted">${esc(m.rut)}</span>`:''}</td>
       <td data-l="Doc">${esc([m.tipoDoc,m.folio].filter(Boolean).join(' '))}${m.cuota?` <span class="small muted">${esc(m.cuota)}</span>`:''}${m.glosa?` <span class="small muted">${esc(m.glosa)}</span>`:''}</td>
@@ -654,7 +656,7 @@ function viewMov(){
     <div class="row">
       <label>Buscar<input value="${esc(f.q)}" placeholder="Contraparte, RUT, folio…" oninput="UI.mov.q=this.value;debRender()"></label>
       <label>Cuenta<select onchange="UI.mov.cta=this.value;render()"><option value="*">Todas</option><option value="-" ${f.cta==='-'?'selected':''}>(sin cuenta)</option>${ctas.map(c=>`<option value="${c.id}" ${f.cta===c.id?'selected':''}>${esc(cuentaLabel(c))}</option>`).join('')}</select></label>
-      <label>Origen<select onchange="UI.mov.origen=this.value;render()">${[['*','Todos'],['cxc','Por cobrar'],['cxp','Por pagar'],['manual','Manual']].map(([k,l])=>`<option value="${k}" ${f.origen===k?'selected':''}>${l}</option>`).join('')}</select></label>
+      <label>Origen<select onchange="UI.mov.origen=this.value;render()">${[['*','Todos'],['cxc','Por cobrar'],['cxp','Por pagar'],['imp','Excel (otros)'],['manual','Manual']].map(([k,l])=>`<option value="${k}" ${f.origen===k?'selected':''}>${l}</option>`).join('')}</select></label>
       <label>Estado<select onchange="UI.mov.estado=this.value;render()">${[['pend','Pendientes'],['pag','Pagados'],['*','Todos']].map(([k,l])=>`<option value="${k}" ${f.estado===k?'selected':''}>${l}</option>`).join('')}</select></label>
       <label>Desde<input type="date" value="${f.desde}" onchange="UI.mov.desde=this.value;render()"></label>
       <label>Hasta<input type="date" value="${f.hasta}" onchange="UI.mov.hasta=this.value;render()"></label>
@@ -815,8 +817,9 @@ async function guardarMov(id){
     if(!a){ toast(`Selecciona el ${quien} desde el buscador (o créalo)`); $('#mAux').focus(); return; }
     const folio = g('#mFo').trim(); if(!folio){ toast('Ingresa el N° de documento'); $('#mFo').focus(); return; }
     Object.assign(base, {auxId:a.id, rut:a.rut, contraparte:a.nombre, tipoDoc:g('#mTD'), folio});
-    const dup = Store.data.movimientos.find(x => x.id!==id && x.empresaId===base.empresaId && x.categoria===catSel && normRut(x.rut)===normRut(a.rut) && String(x.folio)===folio);
-    if(dup && !confirm(`Ya existe el documento ${dup.tipoDoc||''} ${folio} de ${a.nombre} (${fmt(dup.monto)}, ${fDate(fEf(dup))}). ¿Guardar de todas formas?`)) return;
+    const k = claveMov({...base, tipo:tSel, categoria:catSel});
+    const dup = Store.data.movimientos.find(x => x.id!==id && claveMov(x)===k);
+    if(dup){ alert(`No se puede duplicar: el documento ${dup.tipoDoc||''} N° ${folio} de ${a.nombre} ya está ingresado (${fmt(dup.monto)}, vence ${fDate(dup.fecha)}, ${dup.estado}).`); return; }
   }
   if(id){
     const m = Store.data.movimientos.find(x=>x.id===id);
@@ -858,16 +861,32 @@ async function borrarGrupo(g){
    VISTA: IMPORTAR EXCEL
    ===================================================================== */
 const CAMPOS = [
-  ['fecha','Fecha de vencimiento *',[/venc/,/fecha.*pago/,/fecha/]],
-  ['monto','Monto / saldo pendiente *',[/saldo/,/pendiente/,/monto/,/total/,/importe/]],
-  ['contraparte','Razón social / nombre',[/raz[oó]n/,/nombre/,/proveedor/,/cliente/,/auxiliar/]],
-  ['rut','RUT',[/rut/]],
-  ['tipoDoc','Tipo de documento',[/tipo/,/^doc/]],
-  ['folio','Folio / N° documento',[/folio/,/n[uú]m/,/n[°º]/,/^nro/,/documento/]],
+  ['tipo','Tipo (INGRESO / EGRESO)',[/^tipo$/,/ingreso.*egreso|^movimiento$/]],
+  ['tipoDoc','Documento (FACTURA, REMUNERACIONES…)',[/^documento$/,/tipo.*doc/,/^doc$/]],
+  ['folio','N° documento',[/n[uú]mero.*doc/,/folio/,/n[uú]m/,/n[°º]/,/^nro/]],
   ['emision','Fecha de emisión',[/emisi/]],
+  ['fecha','Fecha de vencimiento *',[/venc/,/fecha.*pago/,/^fecha$/]],
+  ['rut','RUT',[/rut/]],
+  ['contraparte','Auxiliar / razón social',[/auxiliar/,/raz[oó]n/,/nombre/,/proveedor/,/cliente/]],
+  ['monto','Importe *',[/importe/,/saldo/,/monto/,/total/]],
   ['cuenta','Cuenta bancaria (opcional)',[/cuenta.*(cte|corr|banc)/,/banco/]],
   ['glosa','Glosa (opcional)',[/glosa/,/detalle/,/descrip/,/observ/]],
 ];
+/* tipos de documento tributario -> código; lo demás se trata como categoría del flujo */
+const DOC_MAP = [[/nota.*cr[eé]d|^n\.?\s?c\.?$/i,'NC'],[/nota.*d[eé]b|^n\.?\s?d\.?$/i,'ND'],[/exent/i,'FEX'],[/^fact|^fac$|^fe$|^fa$|factura/i,'FAC'],[/boleta|^bol$/i,'BOL'],[/gu[ií]a|^gd$/i,'GD']];
+function codDoc(s){ const t = String(s||'').trim(); if(!t) return null; if(TIPOS_DOC.some(x=>x[0]===t.toUpperCase())) return t.toUpperCase(); for(const [re,c] of DOC_MAP) if(re.test(t)) return c; return null; }
+const CAT_MAP = [[/remuner|sueldo|liquidaci/i,'Remuneraciones'],[/imposic|previred|afp|isapre/i,'Imposiciones'],[/impuest|f\s?29|f\s?22|\biva\b|ppm/i,'Impuestos (F29 / F22)'],[/leasing/i,'Leasing'],
+  [/cuota|cr[eé]dito|pr[eé]stamo/i,'Cuota crédito bancario'],[/cr[eé]dito|pr[eé]stamo/i,'Crédito bancario (desembolso)'],[/l[ií]nea/i,'Línea de crédito (abono)'],[/l[ií]nea/i,'Línea de crédito (giro)'],
+  [/arriendo/i,'Arriendos'],[/retiro/i,'Retiro de socios'],[/aporte/i,'Aporte de socios'],[/relacionad/i,'Préstamo empresa relacionada'],[/traspaso/i,'Traspaso entre cuentas']];
+function catDe(s, tipo){ for(const [re,c] of CAT_MAP) if(re.test(s) && CATEGORIAS[tipo].includes(c)) return c; return tipo==='ingreso'?'Otros ingresos':'Otros egresos'; }
+/* clave única de un movimiento: documentos por RUT + tipo doc + número; el resto por categoría + RUT + vencimiento */
+function claveMov(m){
+  const folio = String(m.folio??'').trim().replace(/^0+(?=\d)/,'');
+  if(esDocCat(m.categoria) && folio) return ['D', m.empresaId, m.tipo, normRut(m.rut), codDoc(m.tipoDoc)||String(m.tipoDoc||'').toUpperCase(), folio].join('|');
+  return ['M', m.empresaId, m.tipo, m.categoria, normRut(m.rut), m.fecha].join('|');
+}
+const ORIGEN_LBL = {cxc:'CxC', cxp:'CxP', manual:'Manual', imp:'Excel'};
+
 function viewImp(){
   const st = UI.imp;
   const emps = E();
@@ -875,16 +894,21 @@ function viewImp(){
   <div class="card"><h2>1 · Archivo</h2>
     <div class="form">
       <label>Empresa<select id="iE" onchange="impSet('emp',this.value)">${emps.map(e=>`<option value="${e.id}" ${(st?.emp|| (UI.emp!=='*'?UI.emp:emps[0]?.id))===e.id?'selected':''}>${esc(e.nombre)}</option>`).join('')}</select></label>
-      <label>Tipo de documentos<select id="iO" onchange="impSet('origen',this.value)"><option value="cxp" ${st?.origen==='cxp'?'selected':''}>Por pagar (proveedores)</option><option value="cxc" ${st?.origen==='cxc'?'selected':''}>Por cobrar (clientes)</option></select></label>
+      <label>Ingreso / egreso<select id="iO" onchange="impSet('origen',this.value)">
+        <option value="auto" ${!st||st.origen==='auto'?'selected':''}>Según columna TIPO del archivo</option>
+        <option value="cxp" ${st?.origen==='cxp'?'selected':''}>Todo egreso (por pagar)</option>
+        <option value="cxc" ${st?.origen==='cxc'?'selected':''}>Todo ingreso (por cobrar)</option></select></label>
       <label class="full">Archivo Excel (.xlsx, .xls, .csv)<input type="file" accept=".xlsx,.xls,.xlsm,.csv" onchange="impFile(this.files[0])"></label>
     </div>
-    <p class="small muted">Sirve el reporte de documentos pendientes de Laudus u otro ERP, o la plantilla incluida (plantilla_documentos.xlsx). Si el archivo trae varias empresas, impórtalo filtrado por empresa.</p>
+    <p class="small muted">Formato: <b>TIPO · DOCUMENTO · NUMERO DOC · FECHA EMISION · VENCIMIENTO · RUT · AUXILIAR · IMPORTE A PAGAR</b> (plantilla_registro_flujo_caja.xlsx).
+    Facturas, boletas y notas se registran como documentos por cobrar o por pagar; REMUNERACIONES, IMPOSICIONES, IMPUESTOS, LEASING, CRÉDITO, etc. se registran en su categoría.</p>
+    <p class="small muted"><b>No se duplican datos:</b> un documento ya ingresado (mismo RUT, tipo y número, cargado antes o a mano) se omite; lo mismo para otros movimientos con igual categoría, RUT y vencimiento.</p>
   </div>
-  ${st?.rows ? viewImpMap() : '<div class="card muted">Selecciona un archivo para mapear columnas.</div>'}
+  ${st?.rows ? viewImpMap() : '<div class="card muted">Selecciona un archivo para revisar las columnas.</div>'}
   </div>
   ${st?.prev ? viewImpPrev() : ''}`;
 }
-function impSet(k,v){ UI.imp = UI.imp || {}; UI.imp[k]=v; if(UI.imp.rows) impPreview(); else render(); }
+function impSet(k,v){ UI.imp = UI.imp || {}; UI.imp[k]=v; if(UI.imp.rows){ if(k==='origen') impAutoMap(); impPreview(); } else render(); }
 async function impFile(file){
   if(!file) return;
   const buf = await file.arrayBuffer();
@@ -895,14 +919,15 @@ async function impFile(file){
 function impLoadSheet(){
   const st = UI.imp; const ws = st.wb.Sheets[st.sheet];
   const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:''});
-  let h = 0; for(let i=0;i<Math.min(rows.length,30);i++){ const tx = rows[i].filter(v=>typeof v==='string' && v.trim() && isNaN(parseMonto(v)??NaN)).length; if(tx>=3){ h=i; break; } }
+  let h = 0; for(let i=0;i<Math.min(rows.length,30);i++){ const tx = rows[i].filter(v=>typeof v==='string' && v.trim() && parseMonto(v)==null).length; if(tx>=3){ h=i; break; } }
   st.rows = rows; st.head = h; impAutoMap(); impPreview();
 }
 function impAutoMap(){
-  const st = UI.imp; const hdr = (st.rows[st.head]||[]).map(v=>String(v).toLowerCase().trim());
+  const st = UI.imp; const hdr = (st.rows[st.head]||[]).map(v=>normTxt(v).trim());
   const saved = ls.get('fc_map_'+st.origen, null);
   st.map = {};
   CAMPOS.forEach(([k,,pats])=>{
+    if(k==='tipo' && st.origen!=='auto') return;
     if(saved && saved[k] && hdr.includes(saved[k])){ st.map[k] = hdr.indexOf(saved[k]); return; }
     for(const p of pats){ const i = hdr.findIndex((h,ix)=>p.test(h) && !Object.values(st.map).includes(ix)); if(i>=0){ st.map[k]=i; break; } }
   });
@@ -913,91 +938,108 @@ function viewImpMap(){
     <div class="form">
       <label>Hoja<select onchange="UI.imp.sheet=this.value;impLoadSheet()">${st.wb.SheetNames.map(s=>`<option ${s===st.sheet?'selected':''}>${esc(s)}</option>`).join('')}</select></label>
       <label>Fila de encabezados<input type="number" min="1" value="${st.head+1}" onchange="UI.imp.head=Math.max(0,this.value-1);impAutoMap();impPreview()"></label>
-      ${CAMPOS.map(([k,l])=>`<label>${l}<select onchange="UI.imp.map['${k}']=this.value===''?undefined:+this.value;impPreview()"><option value="">(no usar)</option>${hdr.map((h,i)=>`<option value="${i}" ${st.map[k]===i?'selected':''}>${esc(h||'Col '+(i+1))}</option>`).join('')}</select></label>`).join('')}
+      ${CAMPOS.filter(([k])=>k!=='tipo'||st.origen==='auto').map(([k,l])=>`<label>${l}<select onchange="UI.imp.map['${k}']=this.value===''?undefined:+this.value;impPreview()"><option value="">(no usar)</option>${hdr.map((h,i)=>`<option value="${i}" ${st.map[k]===i?'selected':''}>${esc(String(h).trim()||'Col '+(i+1))}</option>`).join('')}</select></label>`).join('')}
     </div></div>`;
 }
 function impPreview(){
   const st = UI.imp; const m = st.map; const emp = st.emp || $('#iE')?.value; st.emp = emp;
-  const tipo = st.origen==='cxc'? 'ingreso':'egreso';
   const ctas = cuentasDe(emp); const def = ctas.find(c=>c.porDefecto) || ctas[0];
   const matchCta = v => { const s = String(v||'').toLowerCase().replace(/[^a-z0-9]/g,''); if(!s) return null; return ctas.find(c => { const n=String(c.numero||'').replace(/[^0-9]/g,''); return (n && s.includes(n)) || (c.alias && s===c.alias.toLowerCase().replace(/[^a-z0-9]/g,'')); }); };
-  const docs = [], errs = []; const seen = new Map();
+  // índice de lo ya ingresado en esta empresa (todas las fuentes y estados)
+  const exIdx = new Map(); Store.data.movimientos.filter(x=>x.empresaId===emp && !x.traspaso).forEach(x => exIdx.set(claveMov(x), x));
+  const filas = [], seen = new Map();
   st.rows.slice(st.head+1).forEach((r,ix) => {
     if(!r.some(v=>v!=='' && v!=null)) return;
+    const nFila = st.head+ix+2;
     const get = k => m[k]==null? '' : r[m[k]];
-    const monto = parseMonto(get('monto')); const fecha = parseFecha(get('fecha'));
+    const txtDoc = String(get('tipoDoc')||'').trim();
     const contraparte = String(get('contraparte')||'').trim();
-    if(monto==null || fecha==null){
-      if(ix<3 && !contraparte) return; // filas de subtítulos
-      if(/total/i.test(r.join(' '))) return;
-      errs.push(`Fila ${st.head+ix+2}: ${monto==null?'monto':'fecha'} no válido`); return;
-    }
-    if(monto===0) return;
-    const rut = String(get('rut')||'').trim(), tipoDoc = String(get('tipoDoc')||'').trim(), folio = String(get('folio')||'').trim();
-    let clave = [emp, st.origen, normRut(rut), tipoDoc.toUpperCase(), folio].join('|');
-    if(!folio) clave = [emp, st.origen, normRut(rut)||contraparte.toUpperCase(), fecha, monto].join('|');
-    const n = (seen.get(clave)||0)+1; seen.set(clave,n); if(n>1) clave += '|'+n;
+    const f = {fila:nFila, txtDoc, contraparte, rut:String(get('rut')||'').trim(), folio:String(get('folio')??'').trim()};
+    if(/^total/i.test(String(r.find(v=>v!=='')||''))) return;
+    // tipo
+    let tipo = st.origen==='cxc'?'ingreso': st.origen==='cxp'?'egreso':null;
+    if(st.origen==='auto'){ const t = normTxt(get('tipo')).trim(); tipo = /^ing|^abono|^entrada/.test(t)?'ingreso': /^egr|^cargo|^salida|^pago/.test(t)?'egreso':null; }
+    f.tipo = tipo;
+    let monto = parseMonto(get('monto')); const fecha = parseFecha(get('fecha'));
+    f.fecha = fecha; f.monto = monto;
+    const errs = [];
+    if(!tipo) errs.push('TIPO debe ser INGRESO o EGRESO');
+    if(fecha==null) errs.push('vencimiento no válido');
+    if(monto==null || monto===0) errs.push('sin importe');
+    const cod = codDoc(txtDoc);
+    const esDoc = !!cod || (!txtDoc && !!f.folio);
+    if(esDoc && !f.folio) errs.push('documento sin número');
+    if(f.rut && normRut(f.rut).length>1 && !rutValido(f.rut)) f.rutMalo = true;
+    if(errs.length){ f.estado='error'; f.msg = errs.join(', '); filas.push(f); return; }
+    if(cod==='NC' && monto>0) monto = -monto;
+    const categoria = esDoc ? (tipo==='ingreso'?CAT_CXC:CAT_CXP) : catDe(txtDoc, tipo);
     const cta = m.cuenta!=null ? matchCta(get('cuenta')) : null;
-    docs.push({ id:'d_'+hashId(clave), clave, empresaId:emp, origen:st.origen, tipo, categoria: st.origen==='cxc'?CAT_CXC:CAT_CXP,
-      fecha, monto: Math.abs(monto) * (monto<0?-1:1), contraparte, rut, tipoDoc, folio, emision: parseFecha(get('emision')), glosa:String(get('glosa')||'').trim(),
-      auxId: normRut(rut).length>1 ? auxId(rut) : null,
-      _cta: cta?.id || def?.id || null, _ctaExcel: !!cta });
+    const doc = { empresaId:emp, tipo, categoria, origen: esDoc ? (tipo==='ingreso'?'cxc':'cxp') : 'imp',
+      fecha, monto, contraparte, rut: f.rut? fmtRut(f.rut) : '', tipoDoc: esDoc ? (cod||'FAC') : '', docTxt: txtDoc, folio: esDoc? f.folio.replace(/^0+(?=\d)/,'') : '',
+      emision: parseFecha(get('emision')), glosa: String(get('glosa')||'').trim() || (!esDoc && txtDoc && categoria.startsWith('Otros') ? txtDoc : ''),
+      auxId: esDoc && normRut(f.rut).length>1 ? auxId(f.rut) : null, _cta: cta?.id || def?.id || null, _ctaExcel: !!cta };
+    const k = claveMov(doc); doc.id = 'd_'+hashId(k); f.doc = doc; f.clave = k; Object.assign(f, {categoria, monto});
+    if(seen.has(k)){ f.estado='dupArchivo'; f.msg = `repite la fila ${seen.get(k)}`; filas.push(f); return; }
+    seen.set(k, nFila);
+    const x = exIdx.get(k);
+    if(x){ f.existe = x; const dif = x.monto!==monto || x.fecha!==fecha; f.estado = dif? 'cambia':'existe';
+      const org = `${ORIGEN_LBL[x.origen]||x.origen}${x.estado==='pagado'?' · pagado':''}`;
+      f.msg = dif ? `${org} · registrado con ${x.monto!==monto?'importe '+fmt(x.monto):''}${x.monto!==monto&&x.fecha!==fecha?' y ':''}${x.fecha!==fecha?'vencimiento '+fDate(x.fecha):''}` : org; }
+    else f.estado = 'nuevo';
+    filas.push(f);
   });
-  const existentes = Store.data.movimientos.filter(x=>x.empresaId===emp && x.origen===st.origen);
-  const exMap = new Map(existentes.map(x=>[x.id,x]));
-  const ids = new Set(docs.map(d=>d.id));
-  const nuevos = docs.filter(d=>!exMap.has(d.id));
-  const act = docs.filter(d=>exMap.has(d.id));
-  const cambian = act.filter(d=>{ const x=exMap.get(d.id); return x.monto!==d.monto || x.fecha!==d.fecha || x.estado==='pagado'; });
-  const cerrar = existentes.filter(x=>x.estado!=='pagado' && !ids.has(x.id));
-  // documentos ingresados a mano con mismo RUT + folio: el importado los reemplaza
-  const cat = st.origen==='cxc'?CAT_CXC:CAT_CXP;
-  const manMap = new Map(Store.data.movimientos.filter(x=>x.empresaId===emp && x.origen==='manual' && x.categoria===cat && x.folio && x.rut).map(x=>[normRut(x.rut)+'|'+String(x.folio).trim(), x]));
-  const reempl = []; docs.forEach(d => { const x = manMap.get(normRut(d.rut)+'|'+d.folio); if(x){ d._man = x; reempl.push(x); } });
-  st.prev = {docs, errs, nuevos, act, cambian, cerrar, reempl, total: docs.reduce((s,d)=>s+d.monto,0), cerrarOk: st.prev?.cerrarOk ?? true};
+  const by = e => filas.filter(f=>f.estado===e);
+  const claves = new Set(filas.filter(f=>f.clave).map(f=>f.clave));
+  const tiposArchivo = new Set(filas.filter(f=>f.doc && f.doc.origen!=='imp').map(f=>f.doc.origen));
+  const cerrar = Store.data.movimientos.filter(x=>x.empresaId===emp && tiposArchivo.has(x.origen) && x.estado!=='pagado' && !claves.has(claveMov(x)));
+  st.prev = {filas, nuevos:by('nuevo'), existe:by('existe'), cambia:by('cambia'), dupArch:by('dupArchivo'), errores:by('error'), cerrar,
+    updOk: st.prev?.updOk ?? false, cerrarOk: st.prev?.cerrarOk ?? false, ver: st.prev?.ver || 'todos'};
   render();
 }
 function viewImpPrev(){
   const p = UI.imp.prev; const e = empresa(UI.imp.emp);
-  return `<div class="card"><h2>3 · Revisión · ${esc(e?.nombre||'')} · ${UI.imp.origen==='cxc'?'Por cobrar':'Por pagar'}</h2>
+  const totNuevo = p.nuevos.reduce((s,f)=>s+(f.tipo==='ingreso'?1:-1)*f.monto,0);
+  const EST = {nuevo:['cxc','Nuevo'], existe:['','Ya ingresado · se omite'], cambia:['man','Ya ingresado con diferencias'], dupArchivo:['cxp','Duplicado en el archivo · se omite'], error:['cxp','Error · se omite']};
+  const lista = p.ver==='todos' ? p.filas : p.filas.filter(f=>f.estado===p.ver || (p.ver==='omitidos' && f.estado!=='nuevo'));
+  return `<div class="card"><h2>3 · Validación · ${esc(e?.nombre||'')}</h2>
     <div class="kpis">
-      <div class="kpi"><div class="l">Documentos leídos</div><div class="v">${p.docs.length}</div><div class="s">Total ${fmt(p.total)}</div></div>
-      <div class="kpi"><div class="l">Nuevos</div><div class="v pos">${p.nuevos.length}</div><div class="s">${p.reempl.length? p.reempl.length+' reemplazan ingresos manuales':'&nbsp;'}</div></div>
-      <div class="kpi"><div class="l">Ya existentes</div><div class="v">${p.act.length}</div><div class="s">${p.cambian.length} con cambios</div></div>
-      <div class="kpi"><div class="l">Ya no aparecen</div><div class="v ${p.cerrar.length?'neg':''}">${p.cerrar.length}</div><div class="s">${fmt(p.cerrar.reduce((s,x)=>s+x.monto,0))}</div></div>
+      <div class="kpi"><div class="l">Filas leídas</div><div class="v">${p.filas.length}</div><div class="s">${esc(UI.imp.file)}</div></div>
+      <div class="kpi"><div class="l">Nuevos a cargar</div><div class="v pos">${p.nuevos.length}</div><div class="s">Efecto neto ${fmt(totNuevo)}</div></div>
+      <div class="kpi"><div class="l">Ya ingresados</div><div class="v">${p.existe.length + p.cambia.length}</div><div class="s">${p.cambia.length} con diferencias · no se duplican</div></div>
+      <div class="kpi"><div class="l">Duplicados en archivo</div><div class="v ${p.dupArch.length?'neg':''}">${p.dupArch.length}</div><div class="s">Se carga solo la primera fila</div></div>
+      <div class="kpi"><div class="l">Con errores</div><div class="v ${p.errores.length?'neg':''}">${p.errores.length}</div><div class="s">Sin importe, fecha o tipo</div></div>
     </div>
-    <label class="small" style="display:flex;gap:6px;align-items:center;margin-bottom:8px"><input type="checkbox" ${p.cerrarOk?'checked':''} onchange="UI.imp.prev.cerrarOk=this.checked"> El archivo es la cartera completa de pendientes: marcar como <b>pagados</b> los ${p.cerrar.length} documentos que ya no aparecen.</label>
-    ${!cuentasDe(UI.imp.emp).length?'<p class="banner">Esta empresa no tiene cuentas bancarias: los documentos quedarán sin cuenta asignada (igual suman en el flujo de la empresa).</p>':''}
-    ${p.errs.length?`<details><summary class="neg small">${p.errs.length} filas con problemas (se omiten)</summary><div class="small muted">${p.errs.slice(0,50).map(esc).join('<br>')}</div></details>`:''}
-    <div class="tw" style="max-height:300px;margin:10px 0"><table><thead><tr><th>Vencimiento</th><th>Contraparte</th><th>RUT</th><th>Documento</th><th class="n">Monto</th><th>Estado</th></tr></thead><tbody>
-    ${p.docs.slice(0,200).map(d=>`<tr><td>${fDate(d.fecha)}</td><td>${esc(d.contraparte)}</td><td>${esc(d.rut)}</td><td>${esc(d.tipoDoc)} ${esc(d.folio)}</td><td class="n">${fmt(d.monto)}</td><td>${p.nuevos.includes(d)?'<span class="tag cxc">nuevo</span>':p.cambian.includes(d)?'<span class="tag man">cambia</span>':'<span class="tag">igual</span>'}</td></tr>`).join('')}
+    ${p.cambia.length?`<label class="small" style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><input type="checkbox" ${p.updOk?'checked':''} onchange="UI.imp.prev.updOk=this.checked;render()"> Actualizar importe y vencimiento de los <b>${p.cambia.length}</b> ya ingresados que vienen con diferencias (no crea registros nuevos).</label>`:''}
+    ${p.cerrar.length?`<label class="small" style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><input type="checkbox" ${p.cerrarOk?'checked':''} onchange="UI.imp.prev.cerrarOk=this.checked"> El archivo es la cartera completa: marcar como <b>pagados</b> los ${p.cerrar.length} documentos pendientes que no vienen (${fmt(p.cerrar.reduce((s,x)=>s+x.monto,0))}).</label>`:''}
+    ${!cuentasDe(UI.imp.emp).length?'<p class="banner">Esta empresa no tiene cuentas bancarias: los movimientos quedarán sin cuenta asignada (igual suman en el flujo de la empresa).</p>':''}
+    <div class="tbar"><div class="seg">${[['todos','Todas'],['nuevo','Nuevos'],['omitidos','Omitidas'],['error','Errores']].map(([k,l])=>`<button class="${p.ver===k?'on':''}" onclick="UI.imp.prev.ver='${k}';render()">${l}</button>`).join('')}</div></div>
+    <div class="tw" style="max-height:380px"><table class="cards"><thead><tr><th>Fila</th><th>Tipo</th><th>Documento</th><th>N°</th><th>Vencimiento</th><th>RUT</th><th>Auxiliar</th><th>Categoría</th><th class="n">Importe</th><th>Validación</th></tr></thead><tbody>
+    ${lista.slice(0,400).map(f=>`<tr><td data-l="Fila">${f.fila}</td><td data-l="Tipo">${f.tipo? (f.tipo==='ingreso'?'Ingreso':'Egreso') : '<span class="neg">?</span>'}</td><td data-l="Documento">${esc(f.txtDoc)}</td><td data-l="N°">${esc(f.folio)}</td>
+      <td data-l="Vencimiento">${fDate(f.fecha)}</td><td data-l="RUT">${esc(f.rut)}${f.rutMalo?' <span class="neg small" title="Dígito verificador no calza">⚠</span>':''}</td><td data-l="Auxiliar" style="white-space:normal">${esc(f.contraparte)}</td><td data-l="Categoría">${esc(f.categoria||'')}</td>
+      <td class="n ${f.tipo==='egreso'?'neg':'pos'}" data-l="Importe">${f.monto!=null?fmt(f.monto):'-'}</td>
+      <td data-l="Validación" style="white-space:normal"><span class="tag ${EST[f.estado][0]}">${EST[f.estado][1]}</span>${f.msg?` <span class="small muted">${esc(f.msg)}</span>`:''}</td></tr>`).join('') || '<tr><td colspan="10" class="muted">Sin filas</td></tr>'}
     </tbody></table></div>
-    ${p.docs.length>200?`<p class="small muted">Vista previa de 200 de ${p.docs.length}.</p>`:''}
-    <div class="actions"><button class="btn" onclick="UI.imp=null;render()">Cancelar</button><button class="btn pri" onclick="impConfirmar()" ${p.docs.length||p.cerrar.length?'':'disabled'}>Importar</button></div>
+    ${lista.length>400?`<p class="small muted">Mostrando 400 de ${lista.length}.</p>`:''}
+    <div class="actions"><button class="btn" onclick="UI.imp=null;render()">Cancelar</button><button class="btn pri" onclick="impConfirmar()" ${p.nuevos.length||(p.updOk&&p.cambia.length)||(p.cerrarOk&&p.cerrar.length)?'':'disabled'}>Cargar ${p.nuevos.length} nuevos</button></div>
   </div>`;
 }
 async function impConfirmar(){
   const st = UI.imp, p = st.prev;
-  const exMap = new Map(Store.data.movimientos.map(x=>[x.id,x]));
+  // revalidar contra los datos actuales (por si otro usuario cargó mientras tanto)
+  const actuales = new Set(Store.data.movimientos.filter(x=>x.empresaId===st.emp && !x.traspaso).map(claveMov));
   const lote = today()+' '+st.file;
-  const out = p.docs.map(d => {
-    const {_cta,_ctaExcel,_man,...doc} = d; const x = exMap.get(d.id);
-    if(x){
-      const cuentaId = x.cuentaManual ? x.cuentaId : (_ctaExcel ? _cta : (x.cuentaId || _cta));
-      return {...x, ...doc, cuentaId, fechaProg: x.fechaProg||null, estado:'pendiente', fechaPago:null, lote};
-    }
-    if(_man) return {...doc, cuentaId:_man.cuentaId||_cta, cuentaManual:!!_man.cuentaId, fechaProg:_man.fechaProg||null, estado:'pendiente', lote, creado: today()};
-    return {...doc, cuentaId:_cta, estado:'pendiente', lote, creado: today()};
-  });
+  const out = [];
+  let omit = 0;
+  p.nuevos.forEach(f => { if(actuales.has(f.clave)){ omit++; return; } const {_cta,_ctaExcel,...doc} = f.doc; out.push({...doc, cuentaId:_cta, estado:'pendiente', lote, creado: today()}); });
+  if(p.updOk) p.cambia.forEach(f => { const x = f.existe; out.push({...x, monto:f.doc.monto, fecha:f.doc.fecha, lote}); });
   if(p.cerrarOk) p.cerrar.forEach(x => out.push({...x, estado:'pagado', fechaPago: today(), cerradoPorImport: lote}));
-  const hdr = st.rows[st.head]||[]; const mapSave = {}; Object.entries(st.map).forEach(([k,i])=>{ if(i!=null) mapSave[k]=String(hdr[i]).toLowerCase().trim(); });
+  const hdr = st.rows[st.head]||[]; const mapSave = {}; Object.entries(st.map).forEach(([k,i])=>{ if(i!=null) mapSave[k]=normTxt(hdr[i]).trim(); });
   ls.set('fc_map_'+st.origen, mapSave);
   $('#app').style.opacity=.5;
   try{
     await Store.putMany('movimientos', out);
-    if(p.reempl.length) await Store.delMany('movimientos', p.reempl.map(x=>x.id));
-    const nAux = await upsertAux(p.docs.map(d=>({rut:d.rut, nombre:d.contraparte, tipo: st.origen==='cxc'?'cliente':'proveedor'})));
-    toast(`Importación lista: ${p.nuevos.length} nuevos, ${p.act.length} actualizados${p.cerrarOk&&p.cerrar.length?`, ${p.cerrar.length} cerrados`:''}${nAux?`, ${nAux} auxiliares agregados`:''}`, 4500); UI.imp=null; }
+    const nAux = await upsertAux(p.nuevos.filter(f=>f.doc.origen!=='imp' && f.doc.rut).map(f=>({rut:f.doc.rut, nombre:f.doc.contraparte, tipo: f.tipo==='ingreso'?'cliente':'proveedor'})));
+    toast(`Carga lista: ${p.nuevos.length-omit} nuevos · ${p.existe.length+p.cambia.length+p.dupArch.length+omit} omitidos por duplicado${p.updOk&&p.cambia.length?` · ${p.cambia.length} actualizados`:''}${p.errores.length?` · ${p.errores.length} con error`:''}${nAux?` · ${nAux} auxiliares`:''}`, 5000); UI.imp=null; }
   catch(e){ alert('Error al importar: '+e.message); }
   $('#app').style.opacity=1; render();
 }
