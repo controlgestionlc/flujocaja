@@ -119,9 +119,16 @@ table.flujo tr.sec td{background:var(--soft);font-weight:700;font-size:12px;colo
 table.flujo tr.tot td{font-weight:700;border-top:1px solid var(--line2)}
 table.flujo tr.saldo td{font-weight:700;background:var(--row-saldo)}
 table.flujo td.click{cursor:pointer}
+td.lbl{cursor:pointer;color:var(--brand)}
+td.lbl:hover{text-decoration:underline}
+td.lbl svg.info{width:13px;height:13px;margin-left:6px;opacity:0;transition:opacity .15s;vertical-align:-2px}
+tr:hover td.lbl svg.info{opacity:.8}
+table.flujo th.thc{cursor:pointer;color:var(--brand)}
+table.flujo th.thc:hover{text-decoration:underline;background:var(--hover)}
 td input{height:30px}
 table.flujo td.click:hover{background:var(--sel);text-decoration:underline}
-tr.pagado td{color:#8396a8;text-decoration:line-through}
+tr.pagado td{color:#8396a8}
+tr.pagado td[data-l="Monto"],tr.pagado td[data-l="Contraparte"]{text-decoration:line-through}
 
 /* Object status (inverted) */
 .tag{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:var(--r-xs);font-size:12px;font-weight:600;background:#eff1f2;color:var(--muted);border:1px solid #d5dadd}
@@ -213,8 +220,10 @@ tr.pagado td{color:#8396a8;text-decoration:line-through}
    Datos: Firebase Firestore (config.js) o modo local (localStorage)
    ===================================================================== */
 const APP_NAME = 'Flujo de Caja Consolidado';
-const APP_VERSION = '1.5.0';             // sube también VERSION en sw.js al publicar
+const APP_VERSION = '1.7.0';             // sube también VERSION en sw.js al publicar
 const CHANGELOG = [
+  ['1.7.0','23-09-2026','Etiquetas del flujo clicables con ventana de detalle: cada categoría (por contraparte, por período y detalle con pagar/editar y exportar a Excel), saldo inicial por cuenta, composición de totales, flujo neto y saldo final por período, y cada columna de período.'],
+  ['1.6.0','23-09-2026','Dar por pagados los compromisos (fecha y cuenta de pago). Saldo bancario teórico por cuenta = último saldo real + pagos registrados. Nueva pestaña Conciliación: ingreso semanal del saldo real, diferencia contra el teórico, historial y análisis de diferencias (pendientes no marcados, coincidencias exactas, registro de documento faltante). El flujo proyectado parte del saldo teórico.'],
   ['1.5.0','23-09-2026','Importación con el formato REGISTRO FLUJO CAJA (TIPO, DOCUMENTO, NUMERO DOC, FECHA EMISION, VENCIMIENTO, RUT, AUXILIAR, IMPORTE A PAGAR) en un solo archivo de ingresos y egresos. Validación anti-duplicados: omite lo ya ingresado (importado o manual) y los repetidos dentro del archivo; detalle fila por fila antes de cargar. Remuneraciones, imposiciones, impuestos, leasing, etc. se cargan en su categoría. El ingreso manual bloquea documentos duplicados.'],
   ['1.4.0','23-09-2026','Nueva visualización estilo SAP Fiori: barra shell, pestañas con íconos, encabezado de página, KPI en tiles, tablas y diálogos Fiori.'],
   ['1.3.0','22-09-2026','Auxiliar de clientes y proveedores (RUT validado). Cobranza clientes y Pago proveedores exigen cliente/proveedor y N° de documento con buscador dinámico por RUT o nombre. Los documentos importados alimentan el auxiliar y reemplazan los ingresados a mano con el mismo RUT y folio.'],
@@ -223,7 +232,7 @@ const CHANGELOG = [
   ['1.0.0','22-09-2026','Versión inicial: empresas, cuentas, importación Excel CxC/CxP, movimientos manuales, flujo consolidado.'],
 ];
 const PFX = 'fc_';                       // prefijo de colecciones en Firestore
-const COLS = ['empresas','cuentas','movimientos','config','auxiliares'];
+const COLS = ['empresas','cuentas','movimientos','config','auxiliares','saldos'];
 const CAT_CXC = 'Cobranza clientes', CAT_CXP = 'Pago proveedores';
 const CATEGORIAS = {
   ingreso:['Cobranza clientes','Crédito bancario (desembolso)','Línea de crédito (giro)','Aporte de socios','Préstamo empresa relacionada','Traspaso entre cuentas','Venta de activos','Otros ingresos'],
@@ -237,6 +246,7 @@ const ICONS = {
   imp:'<path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 19h16"/>',
   ctas:'<path d="M3 10h18L12 4 3 10z"/><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"/>',
   ajustes:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+  conc:'<path d="M12 3v18M5 7h14M5 7l-3 6a3 3 0 0 0 6 0zM19 7l-3 6a3 3 0 0 0 6 0zM8 21h8"/>',
   add:'<path d="M12 5v14M5 12h14"/>',
   xls:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M9 13l6 6M15 13l-6 6"/>',
   logo:'<path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/>',
@@ -291,7 +301,7 @@ function parseFecha(v){
    ===================================================================== */
 const Store = {
   mode:'local', db:null, user:null,
-  data:{empresas:[],cuentas:[],movimientos:[],config:[],auxiliares:[]},
+  data:{empresas:[],cuentas:[],movimientos:[],config:[],auxiliares:[],saldos:[]},
   unsub:[],
   get hasFirebase(){ const c = window.FLUXCAJA_FIREBASE; return !!(c && c.apiKey && c.projectId && window.firebase); },
   initLocal(){
@@ -413,7 +423,7 @@ function render(){
   const app = $('#app');
   if(Store.mode==='firebase' && !Store.user){ app.innerHTML = viewLogin(); return; }
   if(UI.emp!=='*' && !empresa(UI.emp)) UI.emp='*';
-  const tabs = [['flujo','Flujo de caja','Flujo'],['mov','Movimientos','Movimientos'],['imp','Importar','Importar'],['ctas','Empresas y cuentas','Cuentas'],['ajustes','Ajustes','Ajustes']];
+  const tabs = [['flujo','Flujo de caja','Flujo'],['mov','Movimientos','Movimientos'],['imp','Importar','Importar'],['conc','Conciliación','Conciliar'],['ctas','Empresas y cuentas','Cuentas'],['ajustes','Ajustes','Ajustes']];
   const ini = (Store.user?.email||'').slice(0,2).toUpperCase();
   const hd = pageHead();
   app.innerHTML = `
@@ -431,7 +441,7 @@ function render(){
   <div class="dp-head"><div class="in"><div><h2>${hd.t}</h2><div class="sub">${hd.s}</div></div><span class="sp"></span>${hd.a||''}</div></div>
   <main>
     ${Store.mode==='local' ? `<div class="banner info">Modo local: los datos se guardan solo en este navegador. Configura Firebase en <b>config.js</b> para sincronizar PC y celular.</div>`:''}
-    ${!Store.data.empresas.length && UI.tab!=='ajustes' ? viewBienvenida() : ({flujo:viewFlujo, mov:viewMov, imp:viewImp, ctas:viewCtas, ajustes:viewAjustes}[UI.tab]||viewFlujo)()}
+    ${!Store.data.empresas.length && UI.tab!=='ajustes' ? viewBienvenida() : ({flujo:viewFlujo, mov:viewMov, imp:viewImp, conc:viewConc, ctas:viewCtas, ajustes:viewAjustes}[UI.tab]||viewFlujo)()}
   </main>`;
   afterRender();
 }
@@ -443,6 +453,7 @@ function pageHead(){
     flujo:{t:'Flujo de caja', s:`${esc(emp)} · al ${fDate(today())}`, a: hay?`<button class="btn" onclick="exportFlujo()">${ico('xls')}Exportar</button><button class="btn pri" onclick="nuevoMov()">${ico('add')}Movimiento</button>`:''},
     mov:{t:'Movimientos', s:`${esc(emp)} · documentos y movimientos manuales`, a: hay?`<button class="btn pri" onclick="nuevoMov()">${ico('add')}Movimiento manual</button>`:''},
     imp:{t:'Importar documentos', s:'Por pagar y por cobrar desde Excel'},
+    conc:{t:'Conciliación bancaria', s:`${esc(emp)} · saldo teórico vs saldo real semanal`},
     ctas:{t:'Empresas y cuentas', s:'Saldos bancarios, cuentas corrientes y auxiliar de clientes y proveedores'},
     ajustes:{t:'Ajustes', s:`Versión ${APP_VERSION} · ${Store.mode==='firebase'?'Firebase':'modo local'}`},
   };
@@ -496,7 +507,8 @@ function calcFlujo(empSel, ctaSel, gran, n){
   const pers = gran==='dia' ? (()=>{const r=[];let d=t;for(let i=0;i<n;i++){const x=pDate(d);r.push({ini:d,fin:d,label:`${pad(x.getDate())}-${MES[x.getMonth()]}`});d=addDays(d,1);}return r;})() : periodos(gran,n);
   const cols = [{ini:'0000-00-00', fin:addDays(t,-1), label:'Vencido', venc:true}, ...pers];
   const ctas = Store.data.cuentas.filter(c => (empSel==='*' || c.empresaId===empSel) && (ctaSel==='*' || c.id===ctaSel));
-  const saldoIni = ctas.reduce((s,c)=>s+(+c.saldo||0),0);
+  const saldoIni = ctas.reduce((s,c)=>s+saldoTeorico(c.id).teorico,0);
+  const saldoReal = ctas.reduce((s,c)=>s+(saldosDe(c.id).slice(-1)[0]?.saldo||0),0);
   const cupo = ctas.reduce((s,c)=>s+(+c.cupoLinea||0),0);
   const movs = Store.data.movimientos.filter(m => m.estado!=='pagado' && (empSel==='*' || m.empresaId===empSel) && (ctaSel==='*' || m.cuentaId===ctaSel));
   const cells = {ingreso:{}, egreso:{}}; const ids = {};
@@ -519,7 +531,7 @@ function calcFlujo(empSel, ctaSel, gran, n){
   const cxc = movs.filter(m=>m.categoria===CAT_CXC).reduce((a,m)=>a+m.monto,0);
   const cxp = movs.filter(m=>m.categoria===CAT_CXP).reduce((a,m)=>a+m.monto,0);
   let min = Infinity, minI = 0; sFin.forEach((v,i)=>{ if(v<min){min=v;minI=i;} });
-  return {cols, cells, ids, ti, te, neto, sIni, sFin, saldoIni, cupo, cxc, cxp, fuera, min, minCol: cols[minI], ctas};
+  return {cols, cells, ids, ti, te, neto, sIni, sFin, saldoIni, saldoReal, cupo, cxc, cxp, fuera, min, minCol: cols[minI], ctas};
 }
 let _flujo = null;
 function viewFlujo(){
@@ -530,11 +542,11 @@ function viewFlujo(){
   const catsI = Object.keys(r.cells.ingreso).sort((a,b)=>CATEGORIAS.ingreso.indexOf(a)-CATEGORIAS.ingreso.indexOf(b));
   const catsE = Object.keys(r.cells.egreso).sort((a,b)=>CATEGORIAS.egreso.indexOf(a)-CATEGORIAS.egreso.indexOf(b));
   const num = (v, cls='') => `<td class="n ${cls} ${v<0?'neg':''}">${v? fmt(v): '<span class="muted">-</span>'}</td>`;
-  const catRow = (tipo,cat) => `<tr><td>${esc(cat)}</td>${r.cells[tipo][cat].map((v,i)=>`<td class="n ${v?'click':''}" ${v?`onclick="drill('${tipo}','${esc(cat).replace(/'/g,"\\'")}',${i})"`:''}>${v?fmt(v):'<span class="muted">-</span>'}</td>`).join('')}</tr>`;
+  const catRow = (tipo,cat) => `<tr>${lblCell(cat, `detCat('${tipo}','${jsq(cat)}',1)`)}${r.cells[tipo][cat].map((v,i)=>`<td class="n ${v?'click':''}" ${v?`onclick="drill('${tipo}','${esc(cat).replace(/'/g,"\\'")}',${i})"`:''}>${v?fmt(v):'<span class="muted">-</span>'}</td>`).join('')}</tr>`;
   const ultimo = r.sFin[r.sFin.length-1];
   return `
   <div class="kpis">
-    <div class="kpi"><div class="l">Saldo bancos hoy</div><div class="v ${r.saldoIni<0?'neg':''}">${fmt(r.saldoIni)}</div><div class="s">${r.ctas.length} cuenta(s)${r.cupo?` · líneas ${fmtK(r.cupo)}`:''}</div></div>
+    <div class="kpi" style="cursor:pointer" onclick="setTab('conc')"><div class="l">Saldo bancos teórico</div><div class="v ${r.saldoIni<0?'neg':''}">${fmt(r.saldoIni)}</div><div class="s">Último real ${fmt(r.saldoReal)} · ${r.ctas.length} cuenta(s)${r.cupo?` · líneas ${fmtK(r.cupo)}`:''}</div></div>
     <div class="kpi"><div class="l">Por cobrar (CxC)</div><div class="v pos">${fmt(r.cxc)}</div><div class="s">Vencido: ${fmt(r.cells.ingreso[CAT_CXC]?.[0]||0)}</div></div>
     <div class="kpi"><div class="l">Por pagar (CxP)</div><div class="v neg">${fmt(r.cxp)}</div><div class="s">Vencido: ${fmt(r.cells.egreso[CAT_CXP]?.[0]||0)}</div></div>
     <div class="kpi"><div class="l">Saldo al ${fDate(r.cols[r.cols.length-1].fin)}</div><div class="v ${ultimo<0?'neg':''}">${fmt(ultimo)}</div><div class="s">${r.fuera? r.fuera+' mov. fuera del horizonte':'&nbsp;'}</div></div>
@@ -551,17 +563,17 @@ function viewFlujo(){
   </div>
   <div class="tw" style="max-height:70vh">
   <table class="flujo">
-    <thead><tr><th>Concepto</th>${r.cols.map(c=>`<th class="n" title="${c.venc?'Documentos con fecha anterior a hoy aún pendientes':fDate(c.ini)+' a '+fDate(c.fin)}">${esc(c.label)}</th>`).join('')}</tr></thead>
+    <thead><tr><th>Concepto</th>${r.cols.map((c,i)=>`<th class="n thc" onclick="detPeriodo(${i})" title="${c.venc?'Documentos con fecha anterior a hoy aún pendientes':fDate(c.ini)+' a '+fDate(c.fin)} · clic para ver detalle">${esc(c.label)}</th>`).join('')}</tr></thead>
     <tbody>
-      <tr class="saldo"><td>Saldo inicial</td>${r.sIni.map(v=>num(v)).join('')}</tr>
+      <tr class="saldo">${lblCell('Saldo inicial','detSaldoIni()')}${r.sIni.map(v=>num(v)).join('')}</tr>
       <tr class="sec"><td>Ingresos</td>${r.cols.map(()=>'<td></td>').join('')}</tr>
       ${catsI.map(c=>catRow('ingreso',c)).join('') || `<tr><td class="muted">Sin ingresos</td>${r.cols.map(()=>'<td></td>').join('')}</tr>`}
-      <tr class="tot"><td>Total ingresos</td>${r.ti.map(v=>num(v,'pos')).join('')}</tr>
+      <tr class="tot">${lblCell('Total ingresos',"detTotal('ingreso')")}${r.ti.map(v=>num(v,'pos')).join('')}</tr>
       <tr class="sec"><td>Egresos</td>${r.cols.map(()=>'<td></td>').join('')}</tr>
       ${catsE.map(c=>catRow('egreso',c)).join('') || `<tr><td class="muted">Sin egresos</td>${r.cols.map(()=>'<td></td>').join('')}</tr>`}
-      <tr class="tot"><td>Total egresos</td>${r.te.map(v=>num(v)).join('')}</tr>
-      <tr class="tot"><td>Flujo neto</td>${r.neto.map(v=>num(v)).join('')}</tr>
-      <tr class="saldo"><td>Saldo final</td>${r.sFin.map(v=>num(v)).join('')}</tr>
+      <tr class="tot">${lblCell('Total egresos',"detTotal('egreso')")}${r.te.map(v=>num(v)).join('')}</tr>
+      <tr class="tot">${lblCell('Flujo neto','detResumen()')}${r.neto.map(v=>num(v)).join('')}</tr>
+      <tr class="saldo">${lblCell('Saldo final','detResumen()')}${r.sFin.map(v=>num(v)).join('')}</tr>
     </tbody>
   </table></div>
   ${UI.emp==='*' ? viewResumenEmpresas() : ''}`;
@@ -570,14 +582,14 @@ function saveF(){ ls.set('fc_flujo', {...UI.flujo}); render(); }
 function viewResumenEmpresas(){
   const lim = addDays(today(), 30);
   const rows = E().map(e => {
-    const saldo = cuentasDe(e.id).reduce((s,c)=>s+(+c.saldo||0),0);
+    const saldo = cuentasDe(e.id).reduce((s,c)=>s+saldoTeorico(c.id).teorico,0);
     const pend = Store.data.movimientos.filter(m=>m.empresaId===e.id && m.estado!=='pagado');
     const cxc = pend.filter(m=>m.categoria===CAT_CXC).reduce((s,m)=>s+m.monto,0);
     const cxp = pend.filter(m=>m.categoria===CAT_CXP).reduce((s,m)=>s+m.monto,0);
     const p30 = saldo + pend.filter(m=>fEf(m)<=lim).reduce((s,m)=>s+efecto(m),0);
-    return `<tr style="cursor:pointer" onclick="setEmp('${e.id}')"><td data-l="Empresa"><span class="dot" style="background:${esc(e.color||'#888')}"></span>${esc(e.nombre)}</td><td class="n" data-l="Saldo bancos">${fmt(saldo)}</td><td class="n pos" data-l="CxC">${fmt(cxc)}</td><td class="n neg" data-l="CxP">${fmt(cxp)}</td><td class="n ${p30<0?'neg':''}" data-l="Saldo a 30 días"><b>${fmt(p30)}</b></td></tr>`;
+    return `<tr style="cursor:pointer" onclick="setEmp('${e.id}')"><td data-l="Empresa"><span class="dot" style="background:${esc(e.color||'#888')}"></span>${esc(e.nombre)}</td><td class="n" data-l="Saldo teórico">${fmt(saldo)}</td><td class="n pos" data-l="CxC">${fmt(cxc)}</td><td class="n neg" data-l="CxP">${fmt(cxp)}</td><td class="n ${p30<0?'neg':''}" data-l="Saldo a 30 días"><b>${fmt(p30)}</b></td></tr>`;
   }).join('');
-  return `<div class="card" style="margin-top:14px"><h2>Resumen por empresa</h2><div class="tw"><table class="cards"><thead><tr><th>Empresa</th><th class="n">Saldo bancos</th><th class="n">Por cobrar</th><th class="n">Por pagar</th><th class="n">Saldo a 30 días</th></tr></thead><tbody>${rows}</tbody></table></div>
+  return `<div class="card" style="margin-top:14px"><h2>Resumen por empresa</h2><div class="tw"><table class="cards"><thead><tr><th>Empresa</th><th class="n">Saldo teórico</th><th class="n">Por cobrar</th><th class="n">Por pagar</th><th class="n">Saldo a 30 días</th></tr></thead><tbody>${rows}</tbody></table></div>
   <p class="small muted">Los traspasos y préstamos entre empresas del holding se compensan en la vista consolidada.</p></div>`;
 }
 function drawChart(){
@@ -597,6 +609,92 @@ function drawChart(){
   svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.innerHTML = s;
 }
 addEventListener('resize', ()=>{ clearTimeout(window._rz); window._rz=setTimeout(()=>{ if(UI.tab==='flujo') drawChart(); },150); });
+/* ---------- detalle al hacer clic en las etiquetas del flujo ---------- */
+const jsq = s => String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+const lblCell = (txt, fn, extra='') => `<td class="lbl ${extra}" onclick="${fn}" title="Ver detalle">${esc(txt)}<svg class="i info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg></td>`;
+const movsDeIds = ids => { const s = new Set(ids); return Store.data.movimientos.filter(m=>s.has(m.id)).sort((a,b)=>fEf(a).localeCompare(fEf(b))); };
+const colDe = m => { const f = fEf(m), t = today(); if(f < t) return 0; const i = _flujo.cols.findIndex((c,i)=> i>0 && f>=c.ini && f<=c.fin); return i<0?1:i; };
+function kpiMini(l, v, s='', cls=''){ return `<div class="kpi" style="min-height:0"><div class="l">${l}</div><div class="v ${cls}" style="font-size:20px">${v}</div><div class="s">${s}</div></div>`; }
+UI.det = {vista:'contraparte'};
+function detCat(tipo, cat, reset){
+  if(reset) UI.det = {vista:'contraparte', q:''};
+  const ids = (_flujo.ids[tipo+'|'+cat]||[]).flat(); const ms = movsDeIds(ids);
+  const tot = ms.reduce((s,m)=>s+m.monto,0), venc = ms.filter(m=>colDe(m)===0), prox = ms.find(m=>fEf(m)>=today());
+  const porCp = new Map(); ms.forEach(m => { const k = (m.contraparte||'(sin contraparte)')+'|'+normRut(m.rut); const x = porCp.get(k)||{cp:m.contraparte||'(sin contraparte)', rut:m.rut, n:0, tot:0, venc:0, prox:null}; x.n++; x.tot+=m.monto; if(colDe(m)===0) x.venc+=m.monto; if(fEf(m)>=today() && (!x.prox || fEf(m)<x.prox)) x.prox=fEf(m); porCp.set(k,x); });
+  const cps = [...porCp.values()].sort((a,b)=>Math.abs(b.tot)-Math.abs(a.tot));
+  const porPer = _flujo.cols.map((c,i)=>({c, v:_flujo.cells[tipo][cat][i]})).filter(x=>x.v);
+  const v = UI.det.vista;
+  modal(`<h3>${esc(cat)} <span class="tag ${tipo==='ingreso'?'cxc':'cxp'}">${tipo==='ingreso'?'Ingreso':'Egreso'}</span></h3>
+    <div class="kpis">
+      ${kpiMini('Total en el horizonte', fmt(tot), `${ms.length} compromiso(s)`, tipo==='ingreso'?'pos':'neg')}
+      ${kpiMini('Vencido', fmt(venc.reduce((s,m)=>s+m.monto,0)), `${venc.length} con fecha pasada`, venc.length?'neg':'')}
+      ${kpiMini('Próximo vencimiento', prox? fDate(fEf(prox)) : '-', prox? `${esc(prox.contraparte||'')} · ${fmt(prox.monto)}`:'')}
+      ${kpiMini(cps.length===1?'Contraparte':'Contrapartes', cps.length, cps[0]? `Mayor: ${esc(cps[0].cp)} (${Math.round(Math.abs(cps[0].tot)/Math.abs(tot||1)*100)}%)`:'')}
+    </div>
+    <div class="tbar"><div class="seg">${[['contraparte','Por contraparte'],['periodo','Por período'],['detalle','Detalle']].map(([k,l])=>`<button class="${v===k?'on':''}" onclick="UI.det.vista='${k}';detCat('${tipo}','${jsq(cat)}')">${l}</button>`).join('')}</div><span style="flex:1"></span><button class="btn sm" onclick="exportDet('${jsq(cat)}', ${JSON.stringify(ids).replace(/"/g,'&quot;')})">${ico('xls')}Excel</button></div>
+    ${v==='contraparte' ? `<div class="tw" style="max-height:52vh"><table class="cards"><thead><tr><th>Contraparte</th><th>RUT</th><th class="n">N°</th><th class="n">Vencido</th><th class="n">Total</th><th class="n">%</th><th>Próximo venc.</th></tr></thead><tbody>
+      ${cps.map(x=>`<tr style="cursor:pointer" onclick="UI.det.vista='detalle';UI.det.q='${jsq(x.cp)}';detCat('${tipo}','${jsq(cat)}')"><td data-l="Contraparte" style="white-space:normal">${esc(x.cp)}</td><td data-l="RUT">${esc(x.rut||'')}</td><td class="n" data-l="N°">${x.n}</td><td class="n ${x.venc?'neg':''}" data-l="Vencido">${x.venc?fmt(x.venc):'-'}</td><td class="n" data-l="Total"><b>${fmt(x.tot)}</b></td><td class="n" data-l="%">${Math.round(Math.abs(x.tot)/Math.abs(tot||1)*100)}%</td><td data-l="Próximo">${fDate(x.prox)||'-'}</td></tr>`).join('')}
+      </tbody><tfoot><tr><td colspan="4">Total</td><td class="n">${fmt(tot)}</td><td class="n">100%</td><td></td></tr></tfoot></table></div>`
+    : v==='periodo' ? `<div class="tw" style="max-height:52vh"><table class="cards"><thead><tr><th>Período</th><th>Desde</th><th>Hasta</th><th class="n">Monto</th><th class="n">Acumulado</th></tr></thead><tbody>
+      ${(()=>{ let ac=0; return porPer.map(x=>{ ac+=x.v; return `<tr><td data-l="Período"><b>${esc(x.c.label)}</b></td><td data-l="Desde">${x.c.venc?'-':fDate(x.c.ini)}</td><td data-l="Hasta">${fDate(x.c.fin)}</td><td class="n" data-l="Monto">${fmt(x.v)}</td><td class="n muted" data-l="Acumulado">${fmt(ac)}</td></tr>`; }).join(''); })()}
+      </tbody></table></div>`
+    : (()=>{ const q = (UI.det.q||'').toLowerCase(); const lista = q? ms.filter(m=>(m.contraparte||'').toLowerCase()===q) : ms;
+        return `${q?`<p class="small">Filtrado por <b>${esc(UI.det.q)}</b> · <a href="#" onclick="UI.det.q='';detCat('${tipo}','${jsq(cat)}');return false">ver todos</a></p>`:''}${tablaMov(lista,false)}`; })()}
+    <div class="actions"><button class="btn" onclick="UI.det.q='';closeModal()">Cerrar</button></div>`, true);
+}
+function detSaldoIni(){
+  const r = _flujo;
+  const rows = r.ctas.map(c => { const t = saldoTeorico(c.id); return {c, t}; });
+  modal(`<h3>Saldo inicial · saldo bancario teórico al ${fDate(today())}</h3>
+    <p class="small muted">Saldo teórico = último saldo real ingresado + cobros y pagos dados por pagados desde esa fecha.</p>
+    <div class="tw"><table class="cards"><thead><tr>${UI.emp==='*'?'<th>Empresa</th>':''}<th>Cuenta</th><th class="n">Último saldo real</th><th>Fecha</th><th class="n">Cobros</th><th class="n">Pagos</th><th class="n">Saldo teórico</th></tr></thead><tbody>
+    ${rows.map(({c,t})=>`<tr>${UI.emp==='*'?`<td data-l="Empresa">${esc(empresa(c.empresaId)?.nombre||'')}</td>`:''}<td data-l="Cuenta">${esc(cuentaLabel(c))}</td><td class="n" data-l="Saldo real">${t.base?fmt(t.base.saldo):'-'}</td><td data-l="Fecha" class="${t.base && diasDesde(t.base.fecha)>7?'neg':''}">${t.base?fDate(t.base.fecha):'sin saldo'}</td>
+      <td class="n pos" data-l="Cobros">${t.ing?fmt(t.ing):'-'}</td><td class="n neg" data-l="Pagos">${t.egr?fmt(-t.egr):'-'}</td><td class="n" data-l="Teórico"><b>${fmt(t.teorico)}</b></td></tr>`).join('')}
+    </tbody><tfoot><tr>${UI.emp==='*'?'<td></td>':''}<td>Total</td><td class="n">${fmt(rows.reduce((s,x)=>s+(x.t.base?.saldo||0),0))}</td><td></td><td class="n">${fmt(rows.reduce((s,x)=>s+x.t.ing,0))}</td><td class="n">${fmt(-rows.reduce((s,x)=>s+x.t.egr,0))}</td><td class="n">${fmt(r.saldoIni)}</td></tr></tfoot></table></div>
+    ${r.cupo?`<p class="small muted">Líneas de crédito disponibles (no incluidas en el saldo): ${fmt(r.cupo)}</p>`:''}
+    <div class="actions"><button class="btn" onclick="closeModal()">Cerrar</button><button class="btn pri" onclick="closeModal();setTab('conc')">Ir a Conciliación</button></div>`, true);
+}
+function detTotal(tipo){
+  const r = _flujo; const cells = r.cells[tipo]; const tot = (tipo==='ingreso'?r.ti:r.te).reduce((a,b)=>a+b,0);
+  const cats = Object.entries(cells).map(([k,a])=>({k, tot:a.reduce((x,y)=>x+y,0), venc:a[0], n:(r.ids[tipo+'|'+k]||[]).flat().length})).sort((a,b)=>b.tot-a.tot);
+  modal(`<h3>Total ${tipo==='ingreso'?'ingresos':'egresos'} · composición</h3>
+    <div class="kpis">${kpiMini('Total en el horizonte', fmt(tot), `${cats.reduce((s,c)=>s+c.n,0)} compromiso(s)`, tipo==='ingreso'?'pos':'neg')}${kpiMini('Vencido', fmt(cats.reduce((s,c)=>s+c.venc,0)), 'con fecha pasada')}${kpiMini('Categorías', cats.length)}</div>
+    <div class="tw"><table class="cards"><thead><tr><th>Categoría</th><th class="n">N°</th><th class="n">Vencido</th><th class="n">Total</th><th style="width:30%">Participación</th></tr></thead><tbody>
+    ${cats.map(c=>{ const pct = Math.round(Math.abs(c.tot)/Math.abs(tot||1)*100); return `<tr style="cursor:pointer" onclick="detCat('${tipo}','${jsq(c.k)}',1)"><td data-l="Categoría" class="lbl">${esc(c.k)}</td><td class="n" data-l="N°">${c.n}</td><td class="n ${c.venc?'neg':''}" data-l="Vencido">${c.venc?fmt(c.venc):'-'}</td><td class="n" data-l="Total"><b>${fmt(c.tot)}</b></td>
+      <td data-l="%"><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:8px;background:var(--soft);border-radius:4px"><div style="width:${pct}%;height:100%;border-radius:4px;background:${tipo==='ingreso'?'var(--in)':'var(--out)'}"></div></div><span class="small">${pct}%</span></div></td></tr>`; }).join('')}
+    </tbody></table></div>
+    <div class="actions"><button class="btn" onclick="closeModal()">Cerrar</button></div>`, true);
+}
+function detResumen(){
+  const r = _flujo; let minI = 0; r.sFin.forEach((v,i)=>{ if(v<r.sFin[minI]) minI=i; });
+  const neg = r.cols.map((c,i)=>({c,i})).filter(x=>r.sFin[x.i]<0);
+  modal(`<h3>Flujo neto y saldo final por período</h3>
+    <div class="kpis">${kpiMini('Flujo neto del horizonte', fmt(r.neto.reduce((a,b)=>a+b,0)), 'ingresos − egresos', r.neto.reduce((a,b)=>a+b,0)<0?'neg':'pos')}
+      ${kpiMini('Saldo mínimo', fmt(r.sFin[minI]), esc(r.cols[minI].label), r.sFin[minI]<0?'neg':'')}
+      ${kpiMini('Períodos en negativo', neg.length, neg.length? 'Desde '+esc(neg[0].c.label) : 'Sin déficit', neg.length?'neg':'pos')}
+      ${r.cupo?kpiMini('Líneas de crédito', fmt(r.cupo), r.sFin[minI]<0? (r.sFin[minI]+r.cupo<0?'No alcanzan a cubrir el mínimo':'Cubren el mínimo') : ''):''}</div>
+    <div class="tw" style="max-height:55vh"><table class="cards"><thead><tr><th>Período</th><th class="n">Saldo inicial</th><th class="n">Ingresos</th><th class="n">Egresos</th><th class="n">Flujo neto</th><th class="n">Saldo final</th></tr></thead><tbody>
+    ${r.cols.map((c,i)=>`<tr style="cursor:pointer${i===minI?';background:#fff8d6':''}" onclick="detPeriodo(${i})"><td data-l="Período" class="lbl">${esc(c.label)} <span class="small muted">${c.venc?'':fDate(c.ini)}</span></td><td class="n" data-l="Inicial">${fmt(r.sIni[i])}</td><td class="n pos" data-l="Ingresos">${r.ti[i]?fmt(r.ti[i]):'-'}</td><td class="n neg" data-l="Egresos">${r.te[i]?fmt(-r.te[i]):'-'}</td><td class="n ${r.neto[i]<0?'neg':''}" data-l="Neto">${fmt(r.neto[i])}</td><td class="n ${r.sFin[i]<0?'neg':''}" data-l="Final"><b>${fmt(r.sFin[i])}</b></td></tr>`).join('')}
+    </tbody></table></div>
+    <div class="actions"><button class="btn" onclick="closeModal()">Cerrar</button></div>`, true);
+}
+function detPeriodo(ci){
+  const r = _flujo; const c = r.cols[ci];
+  const ids = Object.values(r.ids).flatMap(a=>a[ci]||[]); const ms = movsDeIds(ids);
+  const grupo = tipo => Object.entries(r.cells[tipo]).filter(([k,a])=>a[ci]).map(([k,a])=>`<tr style="cursor:pointer" onclick="drill('${tipo}','${jsq(k)}',${ci})"><td data-l="Categoría" class="lbl">${esc(k)}</td><td class="n ${tipo==='ingreso'?'pos':'neg'}" data-l="Monto">${fmt(tipo==='ingreso'?a[ci]:-a[ci])}</td></tr>`).join('');
+  modal(`<h3>${c.venc?'Vencido · compromisos con fecha anterior a hoy':`Período ${esc(c.label)} · ${fDate(c.ini)} al ${fDate(c.fin)}`}</h3>
+    <div class="kpis">${kpiMini('Saldo inicial', fmt(r.sIni[ci]))}${kpiMini('Ingresos', fmt(r.ti[ci]), '', 'pos')}${kpiMini('Egresos', fmt(-r.te[ci]), '', 'neg')}${kpiMini('Saldo final', fmt(r.sFin[ci]), `neto ${fmt(r.neto[ci])}`, r.sFin[ci]<0?'neg':'')}</div>
+    <div class="grid2" style="margin-bottom:12px"><div class="tw"><table><thead><tr><th>Ingresos por categoría</th><th class="n">Monto</th></tr></thead><tbody>${grupo('ingreso')||'<tr><td class="muted" colspan="2">Sin ingresos</td></tr>'}</tbody></table></div>
+      <div class="tw"><table><thead><tr><th>Egresos por categoría</th><th class="n">Monto</th></tr></thead><tbody>${grupo('egreso')||'<tr><td class="muted" colspan="2">Sin egresos</td></tr>'}</tbody></table></div></div>
+    ${tablaMov(ms,false)}
+    <div class="actions"><button class="btn" onclick="closeModal()">Cerrar</button></div>`, true);
+}
+function exportDet(nombre, ids){
+  const ms = movsDeIds(ids);
+  const rows = ms.map(m=>({Empresa:empresa(m.empresaId)?.nombre, Cuenta:cuentaLabel(cuenta(m.cuentaId)), Categoria:m.categoria, Fecha:fDate(fEf(m)), Vencimiento:fDate(m.fecha), Contraparte:m.contraparte, RUT:m.rut, Documento:[m.tipoDoc,m.folio].filter(Boolean).join(' '), Glosa:m.glosa, Monto:m.monto}));
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Detalle');
+  XLSX.writeFile(wb, `detalle_${nombre.replace(/[^a-z0-9]+/gi,'_')}_${today()}.xlsx`);
+}
 function drill(tipo, cat, ci){
   const ids = new Set(_flujo.ids[tipo+'|'+cat][ci]);
   const ms = Store.data.movimientos.filter(m=>ids.has(m.id)).sort((a,b)=>fEf(a).localeCompare(fEf(b)));
@@ -634,7 +732,7 @@ function tablaMov(ms, selectable){
     const e = empresa(m.empresaId); const venc = m.estado!=='pagado' && fEf(m)<t;
     return `<tr class="${m.estado==='pagado'?'pagado':''}">
       ${selectable?`<td><input type="checkbox" ${UI.mov.sel.has(m.id)?'checked':''} onchange="selMov('${m.id}',this.checked)"></td>`:''}
-      <td data-l="Fecha" class="${venc?'neg':''}">${fDate(fEf(m))}${m.fechaProg && m.fechaProg!==m.fecha?` <span class="small muted" title="Vencimiento original">(${fDate(m.fecha)})</span>`:''}</td>
+      <td data-l="Fecha" class="${venc?'neg':''}">${fDate(fEf(m))}${m.fechaProg && m.fechaProg!==m.fecha?` <span class="small muted" title="Vencimiento original">(${fDate(m.fecha)})</span>`:''}${m.estado==='pagado'&&m.fechaPago?`<br><span class="small pos" style="text-decoration:none">pagado ${fDate(m.fechaPago)}</span>`:''}</td>
       ${UI.emp==='*'?`<td data-l="Empresa"><span class="dot" style="background:${esc(e?.color||'#888')}"></span>${esc(e?.nombre||'?')}</td>`:''}
       <td data-l="Cuenta">${esc(cuentaLabel(cuenta(m.cuentaId)))}</td>
       <td data-l="Origen"><span class="tag ${m.origen}">${ORIGEN_LBL[m.origen]||m.origen}</span></td>
@@ -642,7 +740,7 @@ function tablaMov(ms, selectable){
       <td data-l="Contraparte" style="white-space:normal;min-width:160px">${esc(m.contraparte||'')}${m.rut?` <span class="small muted">${esc(m.rut)}</span>`:''}</td>
       <td data-l="Doc">${esc([m.tipoDoc,m.folio].filter(Boolean).join(' '))}${m.cuota?` <span class="small muted">${esc(m.cuota)}</span>`:''}${m.glosa?` <span class="small muted">${esc(m.glosa)}</span>`:''}</td>
       <td class="n ${m.tipo==='ingreso'?'pos':'neg'}" data-l="Monto">${fmt(efecto(m))}</td>
-      <td><button class="btn sm" onclick="editMov('${m.id}')">Editar</button></td></tr>`;
+      <td>${m.estado!=='pagado'?`<button class="btn sm" onclick="pagarMovs(['${m.id}'])" title="Dar por pagado">✓ Pagar</button> `:''}<button class="btn sm" onclick="editMov('${m.id}')">Editar</button></td></tr>`;
   }).join('');
   return `<div class="tw" style="max-height:65vh"><table class="cards"><thead><tr>${selectable?`<th><input type="checkbox" onchange="selTodos(this.checked)"></th>`:''}<th>Fecha</th>${UI.emp==='*'?'<th>Empresa</th>':''}<th>Cuenta</th><th>Origen</th><th>Categoría</th><th>Contraparte</th><th>Documento / glosa</th><th class="n">Monto</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="10" class="muted">Sin movimientos</td></tr>'}</tbody></table></div>
   ${ms.length>lim?`<p class="small muted">Mostrando ${lim} de ${ms.length}. Usa los filtros para acotar.</p>`:''}`;
@@ -663,7 +761,7 @@ function viewMov(){
     </div>
     <div class="bulk">
       <span class="small muted">${ms.length} movimientos · neto <b class="${tot<0?'neg':'pos'}">${fmt(tot)}</b>${n?` · <b>${n} seleccionados</b>`:''}</span>
-      ${n?`<button class="btn sm" onclick="bulk('pagado')">Marcar pagado</button><button class="btn sm" onclick="bulk('pendiente')">Marcar pendiente</button><button class="btn sm" onclick="bulk('cuenta')">Asignar cuenta</button><button class="btn sm" onclick="bulk('fecha')">Reprogramar fecha</button><button class="btn sm dan" onclick="bulk('borrar')">Eliminar</button><button class="btn sm" onclick="UI.mov.sel.clear();render()">Quitar selección</button>`:''}
+      ${n?`<button class="btn sm pri" onclick="bulk('pagado')">Dar por pagado</button><button class="btn sm" onclick="bulk('pendiente')">Revertir pago</button><button class="btn sm" onclick="bulk('cuenta')">Asignar cuenta</button><button class="btn sm" onclick="bulk('fecha')">Reprogramar fecha</button><button class="btn sm dan" onclick="bulk('borrar')">Eliminar</button><button class="btn sm" onclick="UI.mov.sel.clear();render()">Quitar selección</button>`:''}
     </div>
     ${tablaMov(ms,true)}
   </div>`;
@@ -675,7 +773,8 @@ async function bulk(acc){
   const ids = new Set(UI.mov.sel); const ms = Store.data.movimientos.filter(m=>ids.has(m.id));
   if(!ms.length) return;
   if(acc==='borrar'){ if(!confirm(`¿Eliminar ${ms.length} movimientos?`)) return; await Store.delMany('movimientos', ms.map(m=>m.id)); UI.mov.sel.clear(); toast('Eliminados'); return; }
-  if(acc==='pagado' || acc==='pendiente'){ await Store.putMany('movimientos', ms.map(m=>({...m, estado:acc, fechaPago: acc==='pagado'? today(): null}))); UI.mov.sel.clear(); toast('Actualizado'); return; }
+  if(acc==='pagado'){ pagarMovs(ms.map(m=>m.id)); return; }
+  if(acc==='pendiente'){ await revertirPago(ms.map(m=>m.id)); return; }
   if(acc==='cuenta'){
     const emps = new Set(ms.map(m=>m.empresaId));
     if(emps.size>1){ alert('Selecciona movimientos de una sola empresa para asignar cuenta.'); return; }
@@ -722,7 +821,8 @@ function editMov(id, nuevo){
     <label class="full">Glosa<input id="mG" value="${esc(m.glosa||'')}" placeholder="Ej: Crédito BCI N° 123, Leasing camión…"></label>
     ${esNuevo?`<label>Repetir (N° cuotas)<input type="number" id="mN" value="1" min="1" max="360"></label>
       <label>Frecuencia<select id="mR"><option value="m">Mensual</option><option value="s">Semanal</option><option value="q">Quincenal</option><option value="t">Trimestral</option><option value="a">Anual</option></select></label>`:
-      `<label>Estado<select id="mS"><option value="pendiente">Pendiente</option><option value="pagado" ${m.estado==='pagado'?'selected':''}>Pagado</option></select></label>`}
+      `<label>Estado<select id="mS" onchange="$('#lFPag').classList.toggle('hide',this.value!=='pagado')"><option value="pendiente">Pendiente</option><option value="pagado" ${m.estado==='pagado'?'selected':''}>Pagado</option></select></label>
+       <label id="lFPag" class="${m.estado==='pagado'?'':'hide'}">Fecha de pago<input type="date" id="mFPag" value="${m.fechaPago||today()}" max="${today()}"></label>`}
   </div>
   ${imp?'<p class="small muted">Al reimportar el Excel se actualizan monto y vencimiento; la fecha reprogramada y la cuenta asignada se mantienen.</p>':''}
   <div class="actions">
@@ -825,7 +925,8 @@ async function guardarMov(id){
     const m = Store.data.movimientos.find(x=>x.id===id);
     const nm = {...m, ...base, tipo:g('#mT'), categoria:g('#mK'), fechaProg:g('#mFP')||null, estado:g('#mS')};
     if(m.cuentaId!==nm.cuentaId) nm.cuentaManual = true;
-    if(nm.estado==='pagado' && m.estado!=='pagado') nm.fechaPago = today();
+    nm.fechaPago = nm.estado==='pagado' ? (g('#mFPag') || today()) : null;
+    if(nm.fechaPago && nm.fechaPago>today()){ toast('La fecha de pago no puede ser futura'); return; }
     await Store.put('movimientos', nm); closeModal(); toast('Guardado'); return;
   }
   const n = Math.max(1, +g('#mN')||1), fr = g('#mR'); const grupo = n>1? uid(): null;
@@ -843,6 +944,8 @@ async function guardarMov(id){
   } else {
     for(let i=0;i<n;i++) out.push({...base, id:uid(), fecha:fechaN(i), tipo:g('#mT'), categoria:g('#mK'), origen:'manual', estado:'pendiente', grupo, cuota: n>1? `${i+1}/${n}`:null});
   }
+  if(window._nuevoPagado){ const fp = window._nuevoPagado; out.forEach(o=>{ o.estado='pagado'; o.fechaPago=fp; }); }
+  window._nuevoPagado = null;
   await Store.putMany('movimientos', out); closeModal(); toast(`${out.length} movimiento(s) creados`);
 }
 async function borrarMov(id){
@@ -1054,18 +1157,214 @@ function viewCtas(){
 }
 function viewCuentas(){
   const emps = UI.emp==='*'? E() : [empresa(UI.emp)];
-  return `<div class="row" style="margin-bottom:12px"><button class="btn pri" onclick="editEmpresa()">${ico('add')}Empresa</button><span class="small muted">Actualiza los saldos con la cartola del día. El flujo parte desde estos saldos.</span></div>
+  return `<div class="row" style="margin-bottom:12px"><button class="btn pri" onclick="editEmpresa()">${ico('add')}Empresa</button><span class="small muted">El saldo real se ingresa con la cartola (idealmente cada semana, en Conciliación). El flujo parte del saldo teórico.</span></div>
   ${emps.map(e => { const cs = cuentasDe(e.id); const tot = cs.reduce((s,c)=>s+(+c.saldo||0),0);
     return `<div class="card"><div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px">
       <h2 style="margin:0"><span class="dot" style="background:${esc(e.color||'#888')}"></span>${esc(e.nombre)} <span class="small muted">${esc(e.rut||'')}</span></h2>
       <div class="row"><button class="btn sm" onclick="editEmpresa('${e.id}')">Editar empresa</button><button class="btn sm" onclick="editCuenta(null,'${e.id}')">+ Cuenta</button></div></div>
-      <div class="tw"><table class="cards"><thead><tr><th>Cuenta</th><th>Banco</th><th>N°</th><th class="n">Línea de crédito</th><th class="n">Saldo</th><th>Fecha saldo</th><th></th></tr></thead><tbody>
+      <div class="tw"><table class="cards"><thead><tr><th>Cuenta</th><th>Banco</th><th>N°</th><th class="n">Línea de crédito</th><th class="n">Saldo real (cartola)</th><th>Fecha saldo</th><th class="n">Saldo teórico hoy</th><th></th></tr></thead><tbody>
       ${cs.map(c=>`<tr><td data-l="Cuenta">${esc(c.alias||'')} ${c.porDefecto?'<span class="tag">por defecto</span>':''}</td><td data-l="Banco">${esc(c.banco||'')}</td><td data-l="N°">${esc(c.numero||'')}</td><td class="n" data-l="Línea">${c.cupoLinea?fmt(c.cupoLinea):'-'}</td>
         <td class="n" data-l="Saldo"><input type="number" value="${+c.saldo||0}" style="width:150px;text-align:right" onchange="saldoRapido('${c.id}',this.value)"></td>
         <td data-l="Fecha saldo" class="${c.fechaSaldo && c.fechaSaldo<today()?'muted':''}">${fDate(c.fechaSaldo)}</td>
-        <td><button class="btn sm" onclick="editCuenta('${c.id}')">Editar</button></td></tr>`).join('') || '<tr><td colspan="7" class="muted">Sin cuentas</td></tr>'}
-      </tbody>${cs.length?`<tfoot><tr><td colspan="4"><b>Total</b></td><td class="n"><b>${fmt(tot)}</b></td><td colspan="2"></td></tr></tfoot>`:''}</table></div></div>`; }).join('')}`;
+        <td class="n" data-l="Saldo teórico hoy"><b>${fmt(saldoTeorico(c.id).teorico)}</b></td>
+        <td><button class="btn sm" onclick="editCuenta('${c.id}')">Editar</button></td></tr>`).join('') || '<tr><td colspan="8" class="muted">Sin cuentas</td></tr>'}
+      </tbody>${cs.length?`<tfoot><tr><td colspan="4"><b>Total</b></td><td class="n"><b>${fmt(tot)}</b></td><td></td><td class="n"><b>${fmt(cs.reduce((s,c)=>s+saldoTeorico(c.id).teorico,0))}</b></td><td></td></tr></tfoot>`:''}</table></div></div>`; }).join('')}`;
 }
+/* =====================================================================
+   SALDO TEÓRICO Y CONCILIACIÓN BANCARIA
+   Saldo teórico = último saldo real ingresado + pagos/cobros dados por pagados después de esa fecha.
+   Cada saldo real se contrasta con el teórico a su fecha (saldo real anterior + pagos del período).
+   ===================================================================== */
+function saldosDe(cid){
+  const L = Store.data.saldos.filter(s=>s.cuentaId===cid).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  if(!L.length){ const c = cuenta(cid); if(c && c.fechaSaldo) return [{id:'v_'+cid, cuentaId:cid, fecha:c.fechaSaldo, saldo:+c.saldo||0, virtual:true}]; }
+  return L;
+}
+const pagosCuenta = (cid, desde, hasta) => Store.data.movimientos.filter(m => m.estado==='pagado' && m.cuentaId===cid && m.fechaPago && (desde==null || m.fechaPago>desde) && m.fechaPago<=hasta);
+function saldoTeorico(cid, fecha){
+  fecha = fecha || today();
+  const L = saldosDe(cid).filter(s=>s.fecha<=fecha); const base = L[L.length-1] || null;
+  const p = pagosCuenta(cid, base?.fecha ?? null, fecha);
+  const ing = p.filter(m=>m.tipo==='ingreso').reduce((s,m)=>s+m.monto,0), egr = p.filter(m=>m.tipo==='egreso').reduce((s,m)=>s+m.monto,0);
+  return {base, pagos:p, ing, egr, teorico:(base?.saldo||0) + ing - egr};
+}
+/* controles de una cuenta con su diferencia (calculada en vivo: si luego se marcan pagos con fecha del período, la diferencia se corrige) */
+function controles(cid){
+  const L = saldosDe(cid);
+  return L.map((s,i) => {
+    if(i===0) return {...s, inicial:true, teorico:null, dif:0};
+    const prev = L[i-1]; const p = pagosCuenta(cid, prev.fecha, s.fecha);
+    const teo = prev.saldo + p.reduce((a,m)=>a+efecto(m),0);
+    return {...s, prev, pagos:p, teorico:teo, dif: s.saldo - teo};
+  });
+}
+const diasDesde = f => f ? Math.round((pDate(today()) - pDate(f))/864e5) : null;
+
+/* ---------- dar por pagado ---------- */
+function pagarMovs(ids){
+  const ms = Store.data.movimientos.filter(m=>ids.includes(m.id) && m.estado!=='pagado');
+  if(!ms.length){ toast('No hay compromisos pendientes seleccionados'); return; }
+  const emps = new Set(ms.map(m=>m.empresaId)); const eid = emps.size===1? [...emps][0] : null;
+  const tot = ms.reduce((s,m)=>s+efecto(m),0);
+  modal(`<h3>Dar por pagado · ${ms.length} compromiso(s)</h3>
+    <p class="small muted">Neto ${fmt(tot)}. Lo pagado sale del flujo proyectado y pasa a mover el <b>saldo teórico</b> de la cuenta en la fecha de pago.</p>
+    <div class="form">
+      <label class="full">Fecha de pago<select id="pgModo" onchange="$('#pgF').disabled=this.value!=='fija'">
+        <option value="fija">Una fecha para todos</option><option value="venc">Fecha de vencimiento de cada uno (si es futura, hoy)</option></select></label>
+      <label>Fecha<input type="date" id="pgF" value="${today()}" max="${today()}"></label>
+      <label>Cuenta de pago<select id="pgC"><option value="">Cuenta asignada a cada uno</option>${eid? cuentasDe(eid).map(c=>`<option value="${c.id}">${esc(cuentaLabel(c))}</option>`).join('') : ''}</select></label>
+    </div>
+    ${!eid?'<p class="small muted">Seleccionaste varias empresas: se usa la cuenta asignada a cada compromiso (o la cuenta por defecto de su empresa).</p>':''}
+    <div class="actions"><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn pri" id="pgOk">Dar por pagado</button></div>`);
+  $('#pgOk').onclick = async () => {
+    const modo = $('#pgModo').value, ff = $('#pgF').value, cSel = $('#pgC').value;
+    if(modo==='fija' && (!ff || ff>today())){ toast('La fecha de pago no puede ser futura'); return; }
+    const out = []; const sinCta = [];
+    const addPago = (m, fp, cid) => out.push({...m, estado:'pagado', fechaPago:fp, cuentaId:cid, ...(cid!==m.cuentaId?{cuentaManual:true}:{})});
+    ms.forEach(m => {
+      const fp = modo==='fija' ? ff : (fEf(m) > today() ? today() : fEf(m));
+      const def = cuentasDe(m.empresaId).find(c=>c.porDefecto) || cuentasDe(m.empresaId)[0];
+      const cid = (cSel && !m.traspaso) ? cSel : (m.cuentaId || def?.id || null);
+      if(!cid) sinCta.push(m);
+      addPago(m, fp, cid);
+      if(m.traspaso) Store.data.movimientos.filter(x=>x.traspaso===m.traspaso && x.id!==m.id && x.estado!=='pagado' && !ids.includes(x.id)).forEach(x=>addPago(x, fp, x.cuentaId));
+    });
+    if(sinCta.length && !confirm(`${sinCta.length} compromiso(s) no tienen cuenta bancaria: se darán por pagados pero no moverán ningún saldo teórico. ¿Continuar?`)) return;
+    await Store.putMany('movimientos', out); UI.mov.sel.clear(); closeModal(); toast(`${out.length} compromiso(s) pagados`);
+    if(window._trasPago) { const f=window._trasPago; window._trasPago=null; f(); }
+  };
+}
+async function revertirPago(ids){
+  const ms = Store.data.movimientos.filter(m=>ids.includes(m.id) && m.estado==='pagado');
+  const tg = new Set(ms.filter(m=>m.traspaso).map(m=>m.traspaso));
+  Store.data.movimientos.filter(x=>x.traspaso && tg.has(x.traspaso) && x.estado==='pagado' && !ms.includes(x)).forEach(x=>ms.push(x));
+  if(!ms.length) return;
+  await Store.putMany('movimientos', ms.map(m=>({...m, estado:'pendiente', fechaPago:null}))); UI.mov.sel.clear(); toast(`${ms.length} pago(s) revertidos`);
+}
+
+/* ---------- vista conciliación ---------- */
+function viewConc(){
+  const emps = UI.emp==='*'? E() : [empresa(UI.emp)];
+  const ctas = emps.flatMap(e=>cuentasDe(e.id));
+  const info = ctas.map(c => { const t = saldoTeorico(c.id); const cs = controles(c.id); const ult = cs[cs.length-1]; return {c, t, ult, dias: diasDesde(ult?.fecha)}; });
+  const totTeo = info.reduce((s,x)=>s+x.t.teorico,0), totReal = info.reduce((s,x)=>s+(x.ult?.saldo||0),0);
+  const difs = info.filter(x=>x.ult && !x.ult.inicial && x.ult.dif);
+  const pend = info.filter(x=>x.dias==null || x.dias>7);
+  return `<div class="kpis">
+    <div class="kpi"><div class="l">Saldo teórico hoy</div><div class="v ${totTeo<0?'neg':''}">${fmt(totTeo)}</div><div class="s">Último saldo real + pagos registrados</div></div>
+    <div class="kpi"><div class="l">Último saldo real</div><div class="v">${fmt(totReal)}</div><div class="s">Según cartolas ingresadas</div></div>
+    <div class="kpi"><div class="l">Diferencias abiertas</div><div class="v ${difs.length?'neg':'pos'}">${difs.length? fmt(difs.reduce((s,x)=>s+x.ult.dif,0)) : 'Cuadrado'}</div><div class="s">${difs.length} cuenta(s) con diferencia en su último control</div></div>
+    <div class="kpi"><div class="l">Por conciliar</div><div class="v ${pend.length?'neg':'pos'}">${pend.length}</div><div class="s">Cuentas sin saldo real hace más de 7 días</div></div>
+  </div>
+  <div class="banner info">Rutina semanal: 1) da por pagados los compromisos que salieron o entraron · 2) ingresa el saldo real de la cartola · 3) si hay diferencia, revísala: casi siempre es un documento no registrado o un pago no marcado.</div>
+  ${emps.map(e => { const rows = info.filter(x=>x.c.empresaId===e.id); if(!rows.length) return '';
+    return `<div class="card"><div class="tbar"><h3><span class="dot" style="background:${esc(e.color||'#888')}"></span>${esc(e.nombre)}</h3></div>
+    <div class="tw"><table class="cards"><thead><tr><th>Cuenta</th><th>Último saldo real</th><th class="n">Cobros registrados</th><th class="n">Pagos registrados</th><th class="n">Saldo teórico hoy</th><th>Último control</th><th></th></tr></thead><tbody>
+    ${rows.map(({c,t,ult,dias}) => `<tr>
+      <td data-l="Cuenta">${esc(cuentaLabel(c))}</td>
+      <td data-l="Último saldo real">${ult? `${fmt(ult.saldo)} <span class="small muted">al ${fDate(ult.fecha)}</span>` : '<span class="muted">sin saldo</span>'}</td>
+      <td class="n pos" data-l="Cobros desde entonces">${t.ing?fmt(t.ing):'-'}</td><td class="n neg" data-l="Pagos desde entonces">${t.egr?fmt(-t.egr):'-'}</td>
+      <td class="n" data-l="Saldo teórico hoy"><b>${fmt(t.teorico)}</b></td>
+      <td data-l="Último control">${!ult?'<span class="tag cxp">Sin saldo inicial</span>': ult.inicial?'<span class="tag">Saldo inicial</span>': ult.dif? `<span class="tag cxp">Diferencia ${fmt(ult.dif)}</span>` : '<span class="tag cxc">Cuadrado</span>'}
+        ${dias!=null?` <span class="small ${dias>7?'neg':'muted'}">hace ${dias} día(s)</span>`:''}</td>
+      <td><button class="btn sm pri" onclick="ingresarSaldo('${c.id}')">Ingresar saldo real</button> <button class="btn sm" onclick="historialCta('${c.id}')">Historial</button></td></tr>`).join('')}
+    </tbody></table></div></div>`; }).join('')}`;
+}
+function ingresarSaldo(cid, fecha){
+  const c = cuenta(cid);
+  modal(`<h3>Saldo real · ${esc(cuentaLabel(c))}</h3>
+    <p class="small muted">Ingresa el saldo contable de la cartola al cierre del día. Se compara con el saldo teórico calculado a esa fecha.</p>
+    <div class="form">
+      <label>Fecha (cierre)<input type="date" id="srF" value="${fecha||today()}" max="${today()}" onchange="srCalc('${cid}')"></label>
+      <label>Saldo real según cartola<input type="number" id="srS" inputmode="numeric" oninput="srCalc('${cid}')" autofocus></label>
+      <label class="full">Nota (opcional)<input id="srN" placeholder="Ej: cartola semana 39"></label>
+    </div>
+    <div id="srRes" style="margin-top:12px"></div>
+    <div class="actions"><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn pri" onclick="guardarSaldo('${cid}')">Guardar saldo</button></div>`);
+  srCalc(cid); setTimeout(()=>$('#srS')?.focus(),50);
+}
+function srCalc(cid){
+  const f = $('#srF').value, v = $('#srS').value; const el = $('#srRes'); if(!el || !f) return;
+  const L = saldosDe(cid).filter(s=>s.fecha<f); const prev = L[L.length-1];
+  if(!prev){ el.innerHTML = `<div class="banner info">Será el <b>saldo inicial</b> de la cuenta: desde aquí se calcula el saldo teórico.</div>`; return; }
+  const p = pagosCuenta(cid, prev.fecha, f); const teo = prev.saldo + p.reduce((a,m)=>a+efecto(m),0);
+  const dif = v===''? null : Math.round(+v) - teo;
+  el.innerHTML = `<div class="kpis" style="margin:0">
+    <div class="kpi" style="min-height:0"><div class="l">Saldo real anterior</div><div class="v" style="font-size:18px">${fmt(prev.saldo)}</div><div class="s">al ${fDate(prev.fecha)}</div></div>
+    <div class="kpi" style="min-height:0"><div class="l">Movimientos pagados</div><div class="v" style="font-size:18px">${fmt(teo-prev.saldo)}</div><div class="s">${p.length} registro(s) en el período</div></div>
+    <div class="kpi" style="min-height:0"><div class="l">Saldo teórico</div><div class="v" style="font-size:18px">${fmt(teo)}</div><div class="s">al ${fDate(f)}</div></div>
+    <div class="kpi" style="min-height:0"><div class="l">Diferencia</div><div class="v ${dif? 'neg':'pos'}" style="font-size:18px">${dif==null?'-': dif? fmt(dif):'Cuadrado'}</div><div class="s">${dif==null?'Ingresa el saldo real': dif? (dif<0?'Faltan egresos por registrar o marcar':'Faltan ingresos por registrar o marcar') : 'Sin diferencias'}</div></div></div>`;
+}
+async function guardarSaldo(cid){
+  const f = $('#srF').value, v = $('#srS').value;
+  if(!f || f>today()){ toast('Fecha no válida'); return; }
+  if(v===''){ toast('Ingresa el saldo real'); return; }
+  const saldo = Math.round(+v); const c = cuenta(cid);
+  const L = saldosDe(cid).filter(s=>s.fecha<f); const prev = L[L.length-1];
+  const teo = prev ? prev.saldo + pagosCuenta(cid, prev.fecha, f).reduce((a,m)=>a+efecto(m),0) : null;
+  await Store.put('saldos', {id: cid+'_'+f, cuentaId:cid, empresaId:c.empresaId, fecha:f, saldo, teoricoAlIngresar:teo, nota:$('#srN').value.trim(), usuario: Store.user?.email||'local', creado:new Date().toISOString()});
+  const ultimo = saldosDe(cid).filter(s=>!s.virtual).pop();
+  if(!c.fechaSaldo || f>=c.fechaSaldo || (ultimo && ultimo.fecha===f)) await Store.put('cuentas', {...c, saldo, fechaSaldo:f});
+  closeModal();
+  const dif = teo==null? 0 : saldo - teo;
+  toast(teo==null? 'Saldo inicial registrado' : dif? `Diferencia de ${fmt(dif)}: revisa el análisis` : 'Cuenta cuadrada');
+  if(dif) setTimeout(()=>analisisDif(cid, f), 200);
+}
+function historialCta(cid){
+  const c = cuenta(cid); const cs = controles(cid).slice().reverse();
+  modal(`<h3>Historial de conciliación · ${esc(cuentaLabel(c))}</h3>
+    <div class="tw"><table class="cards"><thead><tr><th>Fecha</th><th class="n">Saldo real</th><th class="n">Saldo teórico</th><th class="n">Diferencia</th><th>Nota</th><th></th></tr></thead><tbody>
+    ${cs.map(s=>`<tr><td data-l="Fecha">${fDate(s.fecha)}</td><td class="n" data-l="Saldo real">${fmt(s.saldo)}</td><td class="n" data-l="Teórico">${s.inicial?'<span class="muted">saldo inicial</span>':fmt(s.teorico)}</td>
+      <td class="n ${s.dif?'neg':'pos'}" data-l="Diferencia">${s.inicial?'-': s.dif? fmt(s.dif):'Cuadrado'}</td><td data-l="Nota" class="small muted">${esc(s.nota||'')}${s.virtual?'saldo de la ficha de la cuenta':''}</td>
+      <td>${!s.inicial?`<button class="btn sm" onclick="analisisDif('${cid}','${s.fecha}')">Analizar</button>`:''} ${!s.virtual?`<button class="btn sm dan" onclick="borrarSaldo('${s.id}','${cid}')">Eliminar</button>`:''}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">Sin saldos ingresados</td></tr>'}
+    </tbody></table></div>
+    <div class="actions"><button class="btn" onclick="closeModal()">Cerrar</button><button class="btn pri" onclick="ingresarSaldo('${cid}')">Ingresar saldo real</button></div>`, true);
+}
+async function borrarSaldo(id, cid){ if(!confirm('¿Eliminar este saldo real?')) return; await Store.del('saldos', id); const u = saldosDe(cid).filter(s=>!s.virtual).pop(); if(u) await Store.put('cuentas',{...cuenta(cid), saldo:u.saldo, fechaSaldo:u.fecha}); historialCta(cid); }
+function analisisDif(cid, fecha){
+  const c = cuenta(cid); const ctrl = controles(cid).find(s=>s.fecha===fecha); if(!ctrl || ctrl.inicial) return;
+  const dif = ctrl.dif; const signo = dif<0 ? 'egreso' : 'ingreso';
+  // candidatos: pendientes de la empresa con fecha hasta el cierre, en esta cuenta o sin cuenta
+  const cand = Store.data.movimientos.filter(m => m.estado!=='pagado' && m.empresaId===c.empresaId && (m.cuentaId===cid || !m.cuentaId) && fEf(m)<=fecha)
+    .map(m => ({m, exacto: Math.abs(efecto(m) - dif) < 1, mismoSigno: m.tipo===signo}))
+    .sort((a,b)=> (b.exacto-a.exacto) || (b.mismoSigno-a.mismoSigno) || fEf(a.m).localeCompare(fEf(b.m)));
+  const pagos = ctrl.pagos || [];
+  modal(`<h3>Análisis de diferencia · ${esc(cuentaLabel(c))} · ${fDate(fecha)}</h3>
+    <div class="kpis">
+      <div class="kpi" style="min-height:0"><div class="l">Saldo real</div><div class="v" style="font-size:18px">${fmt(ctrl.saldo)}</div></div>
+      <div class="kpi" style="min-height:0"><div class="l">Saldo teórico</div><div class="v" style="font-size:18px">${fmt(ctrl.teorico)}</div><div class="s">${fmt(ctrl.prev.saldo)} al ${fDate(ctrl.prev.fecha)} + ${pagos.length} pagos</div></div>
+      <div class="kpi" style="min-height:0"><div class="l">Diferencia</div><div class="v ${dif?'neg':'pos'}" style="font-size:18px">${dif?fmt(dif):'Cuadrado'}</div><div class="s">${dif<0?'El banco tiene menos: egresos sin registrar o sin marcar':dif>0?'El banco tiene más: ingresos sin registrar o sin marcar':''}</div></div>
+    </div>
+    ${dif?`<h3 style="font-size:14px;margin:14px 0 6px">Compromisos pendientes con fecha hasta el ${fDate(fecha)} (posibles pagos no marcados)</h3>
+    <p class="small muted">Marca los que ya pasaron por el banco y dalos por pagados con fecha dentro del período: la diferencia se recalcula. ★ = importe igual a la diferencia.</p>
+    <div class="tw" style="max-height:260px"><table class="cards"><thead><tr><th></th><th>Fecha</th><th>Categoría</th><th>Contraparte</th><th>Documento</th><th class="n">Efecto</th></tr></thead><tbody>
+    ${cand.slice(0,200).map(({m,exacto,mismoSigno})=>`<tr style="${exacto?'background:#fff8d6':''}"><td><input type="checkbox" class="adSel" value="${m.id}"></td><td data-l="Fecha">${fDate(fEf(m))}</td><td data-l="Categoría">${esc(m.categoria)}</td>
+      <td data-l="Contraparte" style="white-space:normal">${exacto?'★ ':''}${esc(m.contraparte||'')}</td><td data-l="Doc">${esc([m.tipoDoc,m.folio].filter(Boolean).join(' '))}</td>
+      <td class="n ${m.tipo==='ingreso'?'pos':'neg'} ${mismoSigno?'':'muted'}" data-l="Efecto">${fmt(efecto(m))}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">No hay compromisos pendientes con fecha en el período: la diferencia corresponde a documentos no registrados.</td></tr>'}
+    </tbody></table></div>`:''}
+    <details style="margin-top:12px"><summary class="small">Pagos registrados en el período (${pagos.length})</summary>
+    <div class="tw" style="max-height:220px;margin-top:6px"><table><tbody>${pagos.sort((a,b)=>a.fechaPago.localeCompare(b.fechaPago)).map(m=>`<tr><td>${fDate(m.fechaPago)}</td><td>${esc(m.categoria)}</td><td>${esc(m.contraparte||'')}</td><td>${esc([m.tipoDoc,m.folio].filter(Boolean).join(' '))}</td><td class="n ${m.tipo==='ingreso'?'pos':'neg'}">${fmt(efecto(m))}</td></tr>`).join('') || '<tr><td class="muted">Sin pagos</td></tr>'}</tbody></table></div></details>
+    <div class="actions">
+      <button class="btn" onclick="closeModal()">Cerrar</button>
+      ${dif?`<button class="btn" onclick="faltante('${cid}','${fecha}',${dif})">Registrar documento faltante</button>
+      <button class="btn pri" onclick="adPagar('${cid}','${fecha}')">Dar por pagados los marcados</button>`:''}
+    </div>`, true);
+}
+async function adPagar(cid, fecha){
+  const ids = [...document.querySelectorAll('.adSel:checked')].map(x=>x.value);
+  if(!ids.length){ toast('Marca al menos un compromiso'); return; }
+  const ms = Store.data.movimientos.filter(m=>ids.includes(m.id));
+  const out = ms.map(m=>({...m, estado:'pagado', fechaPago: fEf(m)>fecha? fecha : fEf(m), cuentaId:cid, ...(m.cuentaId!==cid?{cuentaManual:true}:{})}));
+  ms.filter(m=>m.traspaso).forEach(m=>Store.data.movimientos.filter(x=>x.traspaso===m.traspaso && x.id!==m.id && x.estado!=='pagado').forEach(x=>out.push({...x, estado:'pagado', fechaPago: out.find(o=>o.id===m.id).fechaPago})));
+  await Store.putMany('movimientos', out); toast(`${out.length} dado(s) por pagado(s)`); analisisDif(cid, fecha);
+}
+function faltante(cid, fecha, dif){
+  const c = cuenta(cid);
+  window._nuevoPagado = fecha;
+  editMov(null, {empresaId:c.empresaId, cuentaId:cid, tipo: dif<0?'egreso':'ingreso', categoria: dif<0?'Pago proveedores':'Cobranza clientes', fecha, monto:Math.abs(dif), origen:'manual', estado:'pendiente', glosa:'Detectado en conciliación '+fDate(fecha)});
+  const h = $('.modal .dlg-h h3'); if(h) h.insertAdjacentHTML('beforeend',` <span class="tag cxc">se registra como pagado el ${fDate(fecha)}</span>`);
+}
+
 /* ---------- Auxiliar de clientes y proveedores ---------- */
 UI.aux = {q:'', tipo:'*'};
 function viewAux(){
@@ -1139,7 +1438,10 @@ async function auxImportExcel(file){
   toast(`${n} registros agregados/actualizados${inval?` · ${inval} RUT inválidos omitidos`:''}`, 4500);
 }
 
-async function saldoRapido(id, v){ const c = cuenta(id); await Store.put('cuentas', {...c, saldo:Math.round(+v||0), fechaSaldo: today()}); toast('Saldo actualizado'); }
+async function saldoRapido(id, v){ const c = cuenta(id); const saldo = Math.round(+v||0); const f = today();
+  await Store.put('saldos', {id:id+'_'+f, cuentaId:id, empresaId:c.empresaId, fecha:f, saldo, nota:'ingresado en ficha de cuentas', usuario: Store.user?.email||'local', creado:new Date().toISOString()});
+  await Store.put('cuentas', {...c, saldo, fechaSaldo:f}); const ct = controles(id).pop();
+  toast(ct && !ct.inicial && ct.dif ? `Saldo real registrado · diferencia ${fmt(ct.dif)} (ver Conciliación)` : 'Saldo real registrado'); }
 const COLORES = ['#455a64','#1e88e5','#b7791f','#8a3b8f','#b3402f','#3b8f8a','#6b6b2e','#555'];
 function editEmpresa(id){
   const e = id? empresa(id) : {nombre:'', rut:'', color:COLORES[Store.data.empresas.length % COLORES.length], orden:Store.data.empresas.length};
@@ -1183,6 +1485,8 @@ async function guardarCuenta(id, eid){
   const upd = [o];
   if(o.porDefecto) cuentasDe(eid).filter(c=>c.id!==o.id && c.porDefecto).forEach(c=>upd.push({...c, porDefecto:false}));
   await Store.putMany('cuentas', upd);
+  const antes = id ? Store.data.saldos.find(x=>x.id===o.id+'_'+o.fechaSaldo) : null;
+  if(o.fechaSaldo && (!id || !antes || antes.saldo!==o.saldo)) await Store.put('saldos', {id:o.id+'_'+o.fechaSaldo, cuentaId:o.id, empresaId:o.empresaId, fecha:o.fechaSaldo, saldo:o.saldo, nota: id?'editado en ficha de cuenta':'saldo inicial', usuario: Store.user?.email||'local', creado:new Date().toISOString()});
   // asignar documentos sin cuenta a la cuenta por defecto
   if(o.porDefecto){ const sin = Store.data.movimientos.filter(m=>m.empresaId===eid && !m.cuentaId); if(sin.length) await Store.putMany('movimientos', sin.map(m=>({...m, cuentaId:o.id}))); }
   closeModal(); toast('Cuenta guardada');
@@ -1262,7 +1566,7 @@ function modal(html, wide){ closeModal(); const d=document.createElement('div');
   const m = d.firstElementChild, c = m.firstElementChild;
   const h = c.querySelector(':scope > h3'); if(h){ const hh=document.createElement('div'); hh.className='dlg-h'; hh.appendChild(h); m.insertBefore(hh,c); }
   const acts = [...c.querySelectorAll(':scope > .actions')].pop(); if(acts){ const ff=document.createElement('div'); ff.className='dlg-f'; ff.appendChild(acts); m.appendChild(ff); } d.addEventListener('mousedown',e=>{ if(e.target===d) closeModal(); }); document.body.appendChild(d); }
-function closeModal(){ $('#mdl')?.remove(); }
+function closeModal(){ $('#mdl')?.remove(); if(!document.querySelector('#mdl')) setTimeout(()=>{ if(!document.querySelector('#mdl')) window._nuevoPagado=null; },0); }
 addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
 
 /* ---------- PWA ---------- */
