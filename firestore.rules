@@ -1,11 +1,65 @@
 rules_version = '2';
+// Flujo de Caja Consolidado · reglas con roles
+// Roles (colección fc_usuarios, id = correo en minúsculas):
+//   admin      · todo, incluida la gestión de usuarios
+//   finanzas   · todo menos usuarios
+//   gerente    · solo lectura
+//   supervisor · lee empresas y auxiliar; crea/edita/borra SOLO sus compromisos forestales pendientes
+//
+// ► Antes de publicar: reemplaza el correo de ADMINS por el correo con que inicias sesión.
+//   Ese usuario podrá activarse como administrador la primera vez.
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Colecciones de Flujo de Caja Consolidado (prefijo fc_). Solo usuarios autenticados.
-    // Para restringir a correos específicos, reemplaza la condición por:
-    //   request.auth != null && request.auth.token.email in ['tu@correo.cl', 'otro@correo.cl']
-    match /{col}/{doc} {
-      allow read, write: if col.matches('fc_.*') && request.auth != null;
+
+    function ADMINS() { return ['TU_CORREO@dominio.cl']; }
+
+    function logueado() { return request.auth != null && request.auth.token.email != null; }
+    function email() { return request.auth.token.email.lower(); }
+    function perfil() { return get(/databases/$(database)/documents/fc_usuarios/$(email())).data; }
+    function tienePerfil() { return logueado() && exists(/databases/$(database)/documents/fc_usuarios/$(email())) && perfil().get('activo', true) == true; }
+    function rol() { return tienePerfil() ? perfil().rol : 'ninguno'; }
+    function esAdmin() { return rol() == 'admin'; }
+    function lector() { return rol() in ['admin', 'finanzas', 'gerente']; }
+    function escritor() { return rol() in ['admin', 'finanzas']; }
+    function esSupervisor() { return rol() == 'supervisor'; }
+
+    // Usuarios y roles
+    match /fc_usuarios/{correo} {
+      allow read: if logueado() && (correo == email() || esAdmin());
+      allow write: if esAdmin()
+        || (logueado() && correo == email() && email() in ADMINS() && request.resource.data.rol == 'admin');
     }
+
+    // Movimientos: finanzas todo; gerente lee; supervisor solo sus compromisos forestales
+    match /fc_movimientos/{id} {
+      allow read: if lector() || (esSupervisor() && resource.data.creadoPor == email());
+      allow create: if escritor()
+        || (esSupervisor() && request.resource.data.origen == 'forestal'
+            && request.resource.data.creadoPor == email() && request.resource.data.estado == 'pendiente');
+      allow update: if escritor()
+        || (esSupervisor() && resource.data.creadoPor == email() && resource.data.estado != 'pagado'
+            && request.resource.data.creadoPor == email() && request.resource.data.origen == 'forestal'
+            && request.resource.data.estado == 'pendiente');
+      allow delete: if escritor()
+        || (esSupervisor() && resource.data.creadoPor == email() && resource.data.estado != 'pagado');
+    }
+
+    // Empresas: todos los roles leen; finanzas escribe
+    match /fc_empresas/{id} {
+      allow read: if lector() || esSupervisor();
+      allow write: if escritor();
+    }
+
+    // Auxiliar de clientes y proveedores: el supervisor puede leer y crear proveedores nuevos
+    match /fc_auxiliares/{id} {
+      allow read: if lector() || esSupervisor();
+      allow create: if escritor() || esSupervisor();
+      allow update, delete: if escritor();
+    }
+
+    // Cuentas, saldos reales y configuración: solo finanzas/gerencia
+    match /fc_cuentas/{id} { allow read: if lector(); allow write: if escritor(); }
+    match /fc_saldos/{id}  { allow read: if lector(); allow write: if escritor(); }
+    match /fc_config/{id}  { allow read: if lector(); allow write: if escritor(); }
   }
 }

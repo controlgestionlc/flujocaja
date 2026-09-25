@@ -138,6 +138,8 @@ tr.pagado td[data-l="Monto"],tr.pagado td[data-l="Contraparte"]{text-decoration:
 .tag{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:var(--r-xs);font-size:12px;font-weight:600;background:#eff1f2;color:var(--muted);border:1px solid #d5dadd}
 .tag.cxc{background:#f5fae5;color:var(--in);border-color:#b8d9a0}
 .tag.cxp{background:#ffeaf4;color:var(--out);border-color:#f4b8b8}
+.tag.forestal{background:#eef6e8;color:#3a6b1f;border-color:#bcd9a6}
+tr.sel td{background:var(--sel)}
 .tag.imp{background:#eaf3fd;color:#0854a0;border-color:#b8d4f4}
 .tag.man{background:#fff3b8;color:#a45d00;border-color:#f5d174}
 .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
@@ -224,8 +226,9 @@ tr.pagado td[data-l="Monto"],tr.pagado td[data-l="Contraparte"]{text-decoration:
    Datos: Firebase Firestore (config.js) o modo local (localStorage)
    ===================================================================== */
 const APP_NAME = 'Flujo de Caja Consolidado';
-const APP_VERSION = '1.8.2';             // sube también VERSION en sw.js al publicar
+const APP_VERSION = '1.9.0';             // sube también VERSION en sw.js al publicar
 const CHANGELOG = [
+  ['1.9.0','25-09-2026','Roles de usuario (Administrador, Finanzas, Gerencia, Supervisor forestal) con permisos aplicados en Firestore. Pestaña Usuarios para crear accesos y asignar roles. Compromisos forestales: los supervisores registran desde el móvil fecha de pago, monto y detalle del negocio (bosque en pie, madera en planta u orilla de camino); aparecen en el flujo como "Compra de madera y bosques" y la gerencia puede abrir cada uno con "Ver negocio".'],
   ['1.8.2','23-09-2026','Tarjetas KPI alineadas: el monto queda a la misma altura en todas, sin importar el largo del texto inferior.'],
   ['1.8.1','23-09-2026','La app siempre abre en Flujo de caja. Ajustes queda solo con Respaldo y Limpieza; la versión e historial se ven al hacer clic en el número de versión y la sesión se cierra desde el círculo con tus iniciales.'],
   ['1.8.0','23-09-2026','Gráfico del flujo con opción Barras o Línea (se recuerda la elección). Clic en una barra o punto abre el detalle del período.'],
@@ -244,7 +247,7 @@ const COLS = ['empresas','cuentas','movimientos','config','auxiliares','saldos']
 const CAT_CXC = 'Cobranza clientes', CAT_CXP = 'Pago proveedores';
 const CATEGORIAS = {
   ingreso:['Cobranza clientes','Crédito bancario (desembolso)','Línea de crédito (giro)','Aporte de socios','Préstamo empresa relacionada','Traspaso entre cuentas','Venta de activos','Otros ingresos'],
-  egreso:['Pago proveedores','Cuota crédito bancario','Leasing','Línea de crédito (abono)','Remuneraciones','Impuestos (F29 / F22)','Imposiciones','Arriendos','Retiro de socios','Préstamo empresa relacionada','Traspaso entre cuentas','Otros egresos']
+  egreso:['Pago proveedores','Compra de madera y bosques','Cuota crédito bancario','Leasing','Línea de crédito (abono)','Remuneraciones','Impuestos (F29 / F22)','Imposiciones','Arriendos','Retiro de socios','Préstamo empresa relacionada','Traspaso entre cuentas','Otros egresos']
 };
 
 /* ---------- íconos (trazos simples estilo Fiori) ---------- */
@@ -255,6 +258,8 @@ const ICONS = {
   ctas:'<path d="M3 10h18L12 4 3 10z"/><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"/>',
   ajustes:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
   conc:'<path d="M12 3v18M5 7h14M5 7l-3 6a3 3 0 0 0 6 0zM19 7l-3 6a3 3 0 0 0 6 0zM8 21h8"/>',
+  forestal:'<path d="M12 2l5 7h-3l4 6h-4l3 5H7l3-5H6l4-6H7z"/><path d="M12 20v3"/>',
+  usuarios:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"/>',
   add:'<path d="M12 5v14M5 12h14"/>',
   xls:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M9 13l6 6M15 13l-6 6"/>',
   logo:'<path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/>',
@@ -309,13 +314,14 @@ function parseFecha(v){
    ===================================================================== */
 const Store = {
   mode:'local', db:null, user:null,
-  data:{empresas:[],cuentas:[],movimientos:[],config:[],auxiliares:[],saldos:[]},
+  data:{empresas:[],cuentas:[],movimientos:[],config:[],auxiliares:[],saldos:[],usuarios:[]},
   unsub:[],
   get hasFirebase(){ const c = window.FLUXCAJA_FIREBASE; return !!(c && c.apiKey && c.projectId && window.firebase); },
   initLocal(){
     this.mode='local';
     const d = ls.get('fluxcaja_local_v1', null);
-    if(d) COLS.forEach(c => this.data[c] = d[c] || []);
+    if(d) [...COLS,'usuarios'].forEach(c => this.data[c] = d[c] || []);
+    initSesionLocal();
   },
   saveLocal(){ ls.set('fluxcaja_local_v1', this.data); },
   async initFirebase(){
@@ -324,16 +330,21 @@ const Store = {
     this.db = firebase.firestore();
     try{ await this.db.enablePersistence({synchronizeTabs:true}); }catch(e){ console.warn('Persistencia offline no disponible', e.code); }
     return new Promise(res => {
-      firebase.auth().onAuthStateChanged(u => {
+      firebase.auth().onAuthStateChanged(async u => {
         this.user = u; this.unsub.forEach(f=>f()); this.unsub=[];
-        if(u) this.subscribe();
+        COLS.concat('usuarios').forEach(c=>this.data[c]=[]);
+        if(u){ await cargarSesion(u); if(Sess.rol){ this.subscribe(); if(!ROLES[Sess.rol].tabs.includes(UI.tab)) UI.tab = ROLES[Sess.rol].tabs[0]; } }
         res(); render();
       });
     });
   },
   subscribe(){
-    COLS.forEach(c => {
-      const f = this.db.collection(PFX+c).onSnapshot(snap => {
+    // cada rol lee solo lo que las reglas le permiten
+    const cols = esSupervisor() ? ['empresas','auxiliares','movimientos'] : COLS.concat(Sess.rol==='admin'?['usuarios']:[]);
+    cols.forEach(c => {
+      let q = this.db.collection(PFX+c);
+      if(esSupervisor() && c==='movimientos') q = q.where('creadoPor','==',Sess.email);
+      const f = q.onSnapshot(snap => {
         this.data[c] = snap.docs.map(d => ({...d.data(), id:d.id}));
         scheduleRender();
       }, err => { console.error(err); toast('Error de lectura: '+err.message, 5000); });
@@ -430,9 +441,11 @@ function setEmp(v){ UI.emp=v; ls.set('fc_emp',v); UI.flujo.cta='*'; UI.mov.cta='
 function render(){
   const app = $('#app');
   if(Store.mode==='firebase' && !Store.user){ app.innerHTML = viewLogin(); return; }
+  if(Store.mode==='firebase' && !Sess.rol){ app.innerHTML = viewSinRol(); return; }
+  const permit = ROLES[Sess.rol].tabs; if(!permit.includes(UI.tab)) UI.tab = permit[0];
   if(UI.emp!=='*' && !empresa(UI.emp)) UI.emp='*';
-  const tabs = [['flujo','Flujo de caja','Flujo'],['mov','Movimientos','Movimientos'],['imp','Importar','Importar'],['conc','Conciliación','Conciliar'],['ctas','Empresas y cuentas','Cuentas'],['ajustes','Ajustes','Ajustes']];
-  const ini = (Store.user?.email||'').slice(0,2).toUpperCase();
+  const tabs = [['flujo','Flujo de caja','Flujo'],['mov','Movimientos','Movimientos'],['forestal', esSupervisor()?'Mis compromisos':'Compromisos forestales','Forestal'],['imp','Importar','Importar'],['conc','Conciliación','Conciliar'],['ctas','Empresas y cuentas','Cuentas'],['usuarios','Usuarios','Usuarios'],['ajustes','Ajustes','Ajustes']].filter(t=>permit.includes(t[0]));
+  const ini = ((Sess.nombre && Sess.nombre.split(/\s+/).filter(w=>/^[a-záéíóúñ]/i.test(w)).map(w=>w[0]).join('').slice(0,2)) || (Sess.email||'').slice(0,2)).toUpperCase();
   const hd = pageHead();
   app.innerHTML = `
   <header class="shell">
@@ -443,13 +456,13 @@ function render(){
       <option value="*">Holding (todas)</option>
       ${E().map(e=>`<option value="${e.id}" ${UI.emp===e.id?'selected':''}>${esc(e.nombre)}</option>`).join('')}
     </select>
-    ${ini?`<div class="avatar" title="${esc(Store.user.email)}" style="cursor:pointer" onclick="menuUsuario()">${esc(ini)}</div>`:''}
+    ${ini?`<div class="avatar" title="${esc(Sess.email)} · ${esc(ROLES[Sess.rol].lbl)}" style="cursor:pointer" onclick="menuUsuario()">${esc(ini)}</div>`:''}
   </header>
   <nav class="tabs">${tabs.map(([k,l,c])=>`<button class="${UI.tab===k?'on':''}" onclick="setTab('${k}')">${ico(k)}<span class="lg">${l}</span><span class="sm">${c}</span></button>`).join('')}</nav>
   <div class="dp-head"><div class="in"><div><h2>${hd.t}</h2><div class="sub">${hd.s}</div></div><span class="sp"></span>${hd.a||''}</div></div>
   <main>
     ${Store.mode==='local' ? `<div class="banner info">Modo local: los datos se guardan solo en este navegador. Configura Firebase en <b>config.js</b> para sincronizar PC y celular.</div>`:''}
-    ${!Store.data.empresas.length && UI.tab!=='ajustes' ? viewBienvenida() : ({flujo:viewFlujo, mov:viewMov, imp:viewImp, conc:viewConc, ctas:viewCtas, ajustes:viewAjustes}[UI.tab]||viewFlujo)()}
+    ${!Store.data.empresas.length && !['ajustes','usuarios'].includes(UI.tab) ? viewBienvenida() : ({flujo:viewFlujo, mov:viewMov, forestal:viewForestal, imp:viewImp, conc:viewConc, ctas:viewCtas, usuarios:viewUsuarios, ajustes:viewAjustes}[UI.tab]||viewFlujo)()}
   </main>`;
   afterRender();
 }
@@ -458,8 +471,10 @@ function pageHead(){
   const emp = UI.emp==='*' ? 'Holding consolidado' : (empresa(UI.emp)?.nombre||'');
   const hay = Store.data.empresas.length;
   const H = {
-    flujo:{t:'Flujo de caja', s:`${esc(emp)} · al ${fDate(today())}`, a: hay?`<button class="btn" onclick="exportFlujo()">${ico('xls')}Exportar</button><button class="btn pri" onclick="nuevoMov()">${ico('add')}Movimiento</button>`:''},
-    mov:{t:'Movimientos', s:`${esc(emp)} · documentos y movimientos manuales`, a: hay?`<button class="btn pri" onclick="nuevoMov()">${ico('add')}Movimiento manual</button>`:''},
+    forestal:{t: esSupervisor()?'Mis compromisos forestales':'Compromisos forestales', s: esSupervisor()? `${esc(Sess.nombre||Sess.email)} · compra de bosques y madera` : `${esc(emp)} · egresos futuros registrados por supervisores`, a: hay && puedeForestal()?`<button class="btn pri" onclick="editForestal()">${ico('add')}Compromiso</button>`:''},
+    usuarios:{t:'Usuarios', s:'Roles y permisos de acceso'},
+    flujo:{t:'Flujo de caja', s:`${esc(emp)} · al ${fDate(today())}`, a: hay?`<button class="btn" onclick="exportFlujo()">${ico('xls')}Exportar</button>${puedeEscribir()?`<button class="btn pri" onclick="nuevoMov()">${ico('add')}Movimiento</button>`:''}`:''},
+    mov:{t:'Movimientos', s:`${esc(emp)} · documentos y movimientos manuales`, a: hay&&puedeEscribir()?`<button class="btn pri" onclick="nuevoMov()">${ico('add')}Movimiento manual</button>`:''},
     imp:{t:'Importar documentos', s:'Por pagar y por cobrar desde Excel'},
     conc:{t:'Conciliación bancaria', s:`${esc(emp)} · saldo teórico vs saldo real semanal`},
     ctas:{t:'Empresas y cuentas', s:'Saldos bancarios, cuentas corrientes y auxiliar de clientes y proveedores'},
@@ -476,7 +491,7 @@ function viewLogin(){
       <button class="btn pri">Entrar</button>
       <div id="lgErr" class="small neg"></div>
     </form>
-    <p class="small muted">Los usuarios se crean en Firebase Console › Authentication.</p></div>`;
+    <p class="small"><a href="#" onclick="olvideClave();return false">¿Olvidaste tu contraseña? / Crear contraseña</a></p></div>`;
 }
 async function doLogin(ev){
   ev.preventDefault();
@@ -485,6 +500,7 @@ async function doLogin(ev){
 }
 
 function viewBienvenida(){
+  if(!puedeEscribir()) return `<div class="card"><h2>Aún no hay empresas</h2><p>El área de finanzas debe crear las empresas antes de registrar información.</p></div>`;
   return `<div class="card"><h2>Comencemos</h2>
     <p>Crea tus empresas y sus cuentas corrientes con el saldo actual. Luego importa el Excel de documentos por pagar y por cobrar, y agrega movimientos manuales (créditos, leasing, remuneraciones, etc.).</p>
     <div class="row"><button class="btn pri" onclick="editEmpresa()">${ico('add')}Crear empresa</button>
@@ -518,7 +534,7 @@ function calcFlujo(empSel, ctaSel, gran, n){
   const saldoIni = ctas.reduce((s,c)=>s+saldoTeorico(c.id).teorico,0);
   const saldoReal = ctas.reduce((s,c)=>s+(saldosDe(c.id).slice(-1)[0]?.saldo||0),0);
   const cupo = ctas.reduce((s,c)=>s+(+c.cupoLinea||0),0);
-  const movs = Store.data.movimientos.filter(m => m.estado!=='pagado' && (empSel==='*' || m.empresaId===empSel) && (ctaSel==='*' || m.cuentaId===ctaSel));
+  const movs = Store.data.movimientos.filter(m => m.estado!=='pagado' && (UI.flujo.est!==false || m.origen!=='forestal' || m.forestal?.estadoNeg==='Confirmado') && (empSel==='*' || m.empresaId===empSel) && (ctaSel==='*' || m.cuentaId===ctaSel));
   const cells = {ingreso:{}, egreso:{}}; const ids = {};
   let fuera = 0;
   const hMax = cols[cols.length-1].fin;
@@ -566,6 +582,7 @@ function viewFlujo(){
       <label>Periodicidad<select onchange="UI.flujo.gran=this.value;UI.flujo.n={dia:30,sem:13,mes:12}[this.value];saveF()">
         <option value="dia" ${F.gran==='dia'?'selected':''}>Diaria</option><option value="sem" ${F.gran==='sem'?'selected':''}>Semanal</option><option value="mes" ${F.gran==='mes'?'selected':''}>Mensual</option></select></label>
       <label>Períodos<input type="number" min="1" max="60" value="${F.n}" style="width:80px" onchange="UI.flujo.n=Math.max(1,Math.min(60,+this.value||1));saveF()"></label>
+      <label style="flex-direction:row;align-items:center;gap:6px;align-self:center;margin-top:18px" title="Compromisos forestales aún no confirmados por el supervisor"><input type="checkbox" ${F.est!==false?'checked':''} onchange="UI.flujo.est=this.checked;saveF()"> Incluir compromisos forestales estimados</label>
       <span style="flex:1"></span>
       <div class="fld"><span class="small muted" style="display:block;margin-bottom:4px">Gráfico</span><div class="seg" id="segGraf">${[['barras','Barras'],['linea','Línea']].map(([k,l])=>`<button data-g="${k}" class="${(F.graf||'barras')===k?'on':''}" onclick="setGraf('${k}')">${l}</button>`).join('')}</div></div>
     </div>
@@ -767,6 +784,7 @@ function filtrarMov(){
 }
 function tablaMov(ms, selectable){
   const t = today(); const lim = 600;
+  selectable = selectable && puedeEscribir();
   const rows = ms.slice(0,lim).map(m => {
     const e = empresa(m.empresaId); const venc = m.estado!=='pagado' && fEf(m)<t;
     return `<tr class="${m.estado==='pagado'?'pagado':''}">
@@ -777,9 +795,9 @@ function tablaMov(ms, selectable){
       <td data-l="Origen"><span class="tag ${m.origen}">${ORIGEN_LBL[m.origen]||m.origen}</span></td>
       <td data-l="Categoría">${esc(m.categoria)}</td>
       <td data-l="Contraparte" style="white-space:normal;min-width:160px">${esc(m.contraparte||'')}${m.rut?` <span class="small muted">${esc(m.rut)}</span>`:''}</td>
-      <td data-l="Doc">${esc([m.tipoDoc,m.folio].filter(Boolean).join(' '))}${m.cuota?` <span class="small muted">${esc(m.cuota)}</span>`:''}${m.glosa?` <span class="small muted">${esc(m.glosa)}</span>`:''}</td>
+      <td data-l="Doc">${esc([m.tipoDoc,m.folio].filter(Boolean).join(' '))}${m.cuota?` <span class="small muted">${esc(m.cuota)}</span>`:''}${m.origen==='forestal'? ` <span class="small muted">${esc(resumenNeg(m))}</span>` : m.glosa?` <span class="small muted">${esc(m.glosa)}</span>`:''}</td>
       <td class="n ${m.tipo==='ingreso'?'pos':'neg'}" data-l="Monto">${fmt(efecto(m))}</td>
-      <td>${m.estado!=='pagado'?`<button class="btn sm" onclick="pagarMovs(['${m.id}'])" title="Dar por pagado">✓ Pagar</button> `:''}<button class="btn sm" onclick="editMov('${m.id}')">Editar</button></td></tr>`;
+      <td>${m.origen==='forestal'?`<button class="btn sm" onclick="verNegocio('${m.id}')">Ver negocio</button> `:''}${puedeEscribir()? `${m.estado!=='pagado'?`<button class="btn sm" onclick="pagarMovs(['${m.id}'])" title="Dar por pagado">✓ Pagar</button> `:''}<button class="btn sm" onclick="editMov('${m.id}')">Editar</button>` : ''}</td></tr>`;
   }).join('');
   return `<div class="tw" style="max-height:65vh"><table class="cards"><thead><tr>${selectable?`<th><input type="checkbox" onchange="selTodos(this.checked)"></th>`:''}<th>Fecha</th>${UI.emp==='*'?'<th>Empresa</th>':''}<th>Cuenta</th><th>Origen</th><th>Categoría</th><th>Contraparte</th><th>Documento / glosa</th><th class="n">Monto</th><th></th></tr></thead><tbody>${rows || '<tr><td colspan="10" class="muted">Sin movimientos</td></tr>'}</tbody></table></div>
   ${ms.length>lim?`<p class="small muted">Mostrando ${lim} de ${ms.length}. Usa los filtros para acotar.</p>`:''}`;
@@ -793,7 +811,7 @@ function viewMov(){
     <div class="row">
       <label>Buscar<input value="${esc(f.q)}" placeholder="Contraparte, RUT, folio…" oninput="UI.mov.q=this.value;debRender()"></label>
       <label>Cuenta<select onchange="UI.mov.cta=this.value;render()"><option value="*">Todas</option><option value="-" ${f.cta==='-'?'selected':''}>(sin cuenta)</option>${ctas.map(c=>`<option value="${c.id}" ${f.cta===c.id?'selected':''}>${esc(cuentaLabel(c))}</option>`).join('')}</select></label>
-      <label>Origen<select onchange="UI.mov.origen=this.value;render()">${[['*','Todos'],['cxc','Por cobrar'],['cxp','Por pagar'],['imp','Excel (otros)'],['manual','Manual']].map(([k,l])=>`<option value="${k}" ${f.origen===k?'selected':''}>${l}</option>`).join('')}</select></label>
+      <label>Origen<select onchange="UI.mov.origen=this.value;render()">${[['*','Todos'],['cxc','Por cobrar'],['cxp','Por pagar'],['forestal','Forestal'],['imp','Excel (otros)'],['manual','Manual']].map(([k,l])=>`<option value="${k}" ${f.origen===k?'selected':''}>${l}</option>`).join('')}</select></label>
       <label>Estado<select onchange="UI.mov.estado=this.value;render()">${[['pend','Pendientes'],['pag','Pagados'],['*','Todos']].map(([k,l])=>`<option value="${k}" ${f.estado===k?'selected':''}>${l}</option>`).join('')}</select></label>
       <label>Desde<input type="date" value="${f.desde}" onchange="UI.mov.desde=this.value;render()"></label>
       <label>Hasta<input type="date" value="${f.hasta}" onchange="UI.mov.hasta=this.value;render()"></label>
@@ -841,6 +859,7 @@ function nuevoMov(){
   editMov(null, {empresaId:eid, cuentaId:def?.id||'', tipo:'egreso', categoria:'Cuota crédito bancario', fecha:today(), monto:'', origen:'manual', estado:'pendiente'});
 }
 function editMov(id, nuevo){
+  if(!nuevo){ const x = Store.data.movimientos.find(y=>y.id===id); if(x && x.origen==='forestal') return editForestal(id); }
   const m = nuevo || Store.data.movimientos.find(x=>x.id===id); if(!m) return;
   const esNuevo = !!nuevo;
   const imp = m.origen==='cxc' || m.origen==='cxp';
@@ -942,7 +961,7 @@ async function auxCrearInline(){
   if(!rutValido(r)){ toast('RUT no válido (revisa el dígito verificador)'); return; }
   if(!n){ toast('Ingresa el nombre'); return; }
   const id = auxId(r); const x = aux(id);
-  if(x){ toast(`Ya existe: ${x.nombre}`); if(x.tipo!==tipo && x.tipo!=='ambos') await Store.put('auxiliares',{...x, tipo:'ambos'}); }
+  if(x){ toast(`Ya existe: ${x.nombre}`); if(x.tipo!==tipo && x.tipo!=='ambos' && puedeEscribir()) await Store.put('auxiliares',{...x, tipo:'ambos'}); }
   else await Store.put('auxiliares', {id, rut:fmtRut(r), nombre:n, tipo});
   $('#auxNew').classList.add('hide'); auxElegir(id);
 }
@@ -1027,7 +1046,7 @@ function claveMov(m){
   if(esDocCat(m.categoria) && folio) return ['D', m.empresaId, m.tipo, normRut(m.rut), codDoc(m.tipoDoc)||String(m.tipoDoc||'').toUpperCase(), folio].join('|');
   return ['M', m.empresaId, m.tipo, m.categoria, normRut(m.rut), m.fecha].join('|');
 }
-const ORIGEN_LBL = {cxc:'CxC', cxp:'CxP', manual:'Manual', imp:'Excel'};
+const ORIGEN_LBL = {cxc:'CxC', cxp:'CxP', manual:'Manual', imp:'Excel', forestal:'Forestal'};
 
 function viewImp(){
   const st = UI.imp;
@@ -1306,7 +1325,7 @@ function viewConc(){
       <td class="n" data-l="Saldo teórico hoy"><b>${fmt(t.teorico)}</b></td>
       <td data-l="Último control">${!ult?'<span class="tag cxp">Sin saldo inicial</span>': ult.inicial?'<span class="tag">Saldo inicial</span>': ult.dif? `<span class="tag cxp">Diferencia ${fmt(ult.dif)}</span>` : '<span class="tag cxc">Cuadrado</span>'}
         ${dias!=null?` <span class="small ${dias>7?'neg':'muted'}">hace ${dias} día(s)</span>`:''}</td>
-      <td><button class="btn sm pri" onclick="ingresarSaldo('${c.id}')">Ingresar saldo real</button> <button class="btn sm" onclick="historialCta('${c.id}')">Historial</button></td></tr>`).join('')}
+      <td>${puedeEscribir()?`<button class="btn sm pri" onclick="ingresarSaldo('${c.id}')">Ingresar saldo real</button> `:''}<button class="btn sm" onclick="historialCta('${c.id}')">Historial</button></td></tr>`).join('')}
     </tbody></table></div></div>`; }).join('')}`;
 }
 function ingresarSaldo(cid, fecha){
@@ -1355,9 +1374,9 @@ function historialCta(cid){
     <div class="tw"><table class="cards"><thead><tr><th>Fecha</th><th class="n">Saldo real</th><th class="n">Saldo teórico</th><th class="n">Diferencia</th><th>Nota</th><th></th></tr></thead><tbody>
     ${cs.map(s=>`<tr><td data-l="Fecha">${fDate(s.fecha)}</td><td class="n" data-l="Saldo real">${fmt(s.saldo)}</td><td class="n" data-l="Teórico">${s.inicial?'<span class="muted">saldo inicial</span>':fmt(s.teorico)}</td>
       <td class="n ${s.dif?'neg':'pos'}" data-l="Diferencia">${s.inicial?'-': s.dif? fmt(s.dif):'Cuadrado'}</td><td data-l="Nota" class="small muted">${esc(s.nota||'')}${s.virtual?'saldo de la ficha de la cuenta':''}</td>
-      <td>${!s.inicial?`<button class="btn sm" onclick="analisisDif('${cid}','${s.fecha}')">Analizar</button>`:''} ${!s.virtual?`<button class="btn sm dan" onclick="borrarSaldo('${s.id}','${cid}')">Eliminar</button>`:''}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">Sin saldos ingresados</td></tr>'}
+      <td>${!s.inicial?`<button class="btn sm" onclick="analisisDif('${cid}','${s.fecha}')">Analizar</button>`:''} ${!s.virtual&&puedeEscribir()?`<button class="btn sm dan" onclick="borrarSaldo('${s.id}','${cid}')">Eliminar</button>`:''}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">Sin saldos ingresados</td></tr>'}
     </tbody></table></div>
-    <div class="actions"><button class="btn" onclick="closeModal()">Cerrar</button><button class="btn pri" onclick="ingresarSaldo('${cid}')">Ingresar saldo real</button></div>`, true);
+    <div class="actions"><button class="btn" onclick="closeModal()">Cerrar</button>${puedeEscribir()?`<button class="btn pri" onclick="ingresarSaldo('${cid}')">Ingresar saldo real</button>`:''}</div>`, true);
 }
 async function borrarSaldo(id, cid){ if(!confirm('¿Eliminar este saldo real?')) return; await Store.del('saldos', id); const u = saldosDe(cid).filter(s=>!s.virtual).pop(); if(u) await Store.put('cuentas',{...cuenta(cid), saldo:u.saldo, fechaSaldo:u.fecha}); historialCta(cid); }
 function analisisDif(cid, fecha){
@@ -1385,7 +1404,7 @@ function analisisDif(cid, fecha){
     <div class="tw" style="max-height:220px;margin-top:6px"><table><tbody>${pagos.sort((a,b)=>a.fechaPago.localeCompare(b.fechaPago)).map(m=>`<tr><td>${fDate(m.fechaPago)}</td><td>${esc(m.categoria)}</td><td>${esc(m.contraparte||'')}</td><td>${esc([m.tipoDoc,m.folio].filter(Boolean).join(' '))}</td><td class="n ${m.tipo==='ingreso'?'pos':'neg'}">${fmt(efecto(m))}</td></tr>`).join('') || '<tr><td class="muted">Sin pagos</td></tr>'}</tbody></table></div></details>
     <div class="actions">
       <button class="btn" onclick="closeModal()">Cerrar</button>
-      ${dif?`<button class="btn" onclick="faltante('${cid}','${fecha}',${dif})">Registrar documento faltante</button>
+      ${dif&&puedeEscribir()?`<button class="btn" onclick="faltante('${cid}','${fecha}',${dif})">Registrar documento faltante</button>
       <button class="btn pri" onclick="adPagar('${cid}','${fecha}')">Dar por pagados los marcados</button>`:''}
     </div>`, true);
 }
@@ -1402,6 +1421,230 @@ function faltante(cid, fecha, dif){
   window._nuevoPagado = fecha;
   editMov(null, {empresaId:c.empresaId, cuentaId:cid, tipo: dif<0?'egreso':'ingreso', categoria: dif<0?'Pago proveedores':'Cobranza clientes', fecha, monto:Math.abs(dif), origen:'manual', estado:'pendiente', glosa:'Detectado en conciliación '+fDate(fecha)});
   const h = $('.modal .dlg-h h3'); if(h) h.insertAdjacentHTML('beforeend',` <span class="tag cxc">se registra como pagado el ${fDate(fecha)}</span>`);
+}
+
+/* =====================================================================
+   ROLES Y USUARIOS
+   admin: todo + usuarios · finanzas: todo menos usuarios · gerente: consulta
+   supervisor: solo sus compromisos forestales (desde el móvil)
+   ===================================================================== */
+const ROLES = {
+  admin:{lbl:'Administrador', desc:'Acceso total y gestión de usuarios', tabs:['flujo','mov','forestal','imp','conc','ctas','usuarios','ajustes']},
+  finanzas:{lbl:'Finanzas', desc:'Carga, pagos, conciliación y compromisos', tabs:['flujo','mov','forestal','imp','conc','ctas','ajustes']},
+  gerente:{lbl:'Gerencia (consulta)', desc:'Ve flujo, movimientos, compromisos forestales y conciliación sin modificar', tabs:['flujo','mov','forestal','conc']},
+  supervisor:{lbl:'Supervisor forestal', desc:'Registra y edita solo sus compromisos de compra de madera', tabs:['forestal']},
+};
+const Sess = {email:null, nombre:'', rol:null};
+const puedeEscribir = () => ['admin','finanzas'].includes(Sess.rol);
+const puedeForestal = () => ['admin','finanzas','supervisor'].includes(Sess.rol);
+const esSupervisor = () => Sess.rol==='supervisor';
+const editableForestal = m => puedeEscribir() || (esSupervisor() && m.creadoPor===Sess.email && m.estado!=='pagado');
+function initSesionLocal(){ const r = ls.get('fc_rol_sim','admin'); Sess.rol = r; Sess.email = r==='supervisor' ? 'supervisor@local' : r+'@local'; Sess.nombre = r==='supervisor' ? 'Supervisor de prueba' : ROLES[r].lbl; }
+function simularRol(r){ ls.set('fc_rol_sim', r); initSesionLocal(); UI.tab = ROLES[r].tabs[0]; render(); toast('Viendo la app como '+ROLES[r].lbl); }
+async function cargarSesion(u){
+  Sess.email = (u.email||'').toLowerCase(); Sess.rol = null; Sess.nombre = '';
+  try{ const d = await Store.db.collection(PFX+'usuarios').doc(Sess.email).get(); if(d.exists && d.data().activo!==false){ Sess.rol = d.data().rol; Sess.nombre = d.data().nombre||''; } }
+  catch(e){ console.warn('No se pudo leer el rol', e.code); }
+}
+function viewSinRol(){
+  return `<div class="login card"><h2>Sin acceso asignado</h2>
+    <p>Ingresaste como <b>${esc(Sess.email)}</b>, pero tu usuario aún no tiene un rol en ${APP_NAME}.</p>
+    <p class="small muted">Pide al administrador que te agregue en la pestaña Usuarios. Si eres el administrador principal (tu correo está en las reglas de Firestore), activa tu acceso:</p>
+    <div class="actions" style="justify-content:flex-start"><button class="btn pri" onclick="activarAdmin()">Activar como administrador</button><button class="btn" onclick="firebase.auth().signOut()">Cerrar sesión</button></div>
+    <div id="saErr" class="small neg"></div></div>`;
+}
+async function activarAdmin(){
+  try{ await Store.db.collection(PFX+'usuarios').doc(Sess.email).set({email:Sess.email, nombre:'Administrador', rol:'admin', activo:true, creado:new Date().toISOString()}); location.reload(); }
+  catch(e){ $('#saErr').textContent = 'No autorizado: tu correo no está en la lista ADMINS de firestore.rules. ('+(e.code||e.message)+')'; }
+}
+async function olvideClave(){
+  const e = $('#lgE').value.trim(); if(!e){ $('#lgErr').textContent='Escribe tu correo y vuelve a presionar.'; return; }
+  try{ await firebase.auth().sendPasswordResetEmail(e); $('#lgErr').innerHTML = '<span class="pos">Te enviamos un correo para crear una nueva contraseña.</span>'; }
+  catch(err){ $('#lgErr').textContent = 'No se pudo enviar: '+(err.code||err.message); }
+}
+
+/* ---------- vista Usuarios (admin) ---------- */
+function viewUsuarios(){
+  const us = [...Store.data.usuarios].sort((a,b)=>(a.rol+a.email).localeCompare(b.rol+b.email));
+  const nFor = email => Store.data.movimientos.filter(m=>m.origen==='forestal' && m.creadoPor===email && m.estado!=='pagado').length;
+  return `${Store.mode==='local'?`<div class="card"><h2>Simular rol (modo local)</h2><p class="small muted">Para probar cómo ve la app cada perfil. Con Firebase el rol viene del usuario que inicia sesión.</p>
+    <div class="seg">${Object.entries(ROLES).map(([k,r])=>`<button class="${Sess.rol===k?'on':''}" onclick="simularRol('${k}')">${r.lbl}</button>`).join('')}</div></div>`:''}
+  <div class="card"><div class="tbar"><h3>Usuarios y roles</h3><span style="flex:1"></span><button class="btn pri" onclick="editUsuario()">${ico('add')}Usuario</button></div>
+    <div class="tw"><table class="cards"><thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th><th class="n">Compromisos pendientes</th><th></th></tr></thead><tbody>
+    ${us.map(u=>`<tr><td data-l="Nombre">${esc(u.nombre||'')}</td><td data-l="Correo">${esc(u.email)}</td><td data-l="Rol"><span class="tag ${u.rol==='supervisor'?'forestal':u.rol==='admin'?'cxp':''}">${esc(ROLES[u.rol]?.lbl||u.rol)}</span></td>
+      <td data-l="Estado">${u.activo===false?'<span class="tag cxp">Desactivado</span>':'<span class="tag cxc">Activo</span>'}</td><td class="n" data-l="Compromisos">${u.rol==='supervisor'?nFor(u.email):'-'}</td>
+      <td><button class="btn sm" onclick="editUsuario('${esc(u.email)}')">Editar</button></td></tr>`).join('') || '<tr><td colspan="6" class="muted">Sin usuarios registrados</td></tr>'}
+    </tbody></table></div></div>
+  <div class="card"><h2>Roles</h2><div class="tw"><table class="cards"><tbody>${Object.values(ROLES).map(r=>`<tr><td data-l="Rol"><b>${r.lbl}</b></td><td data-l="Permisos" style="white-space:normal">${r.desc}</td></tr>`).join('')}</tbody></table></div></div>`;
+}
+function editUsuario(email){
+  const u = email ? Store.data.usuarios.find(x=>x.email===email) : {email:'', nombre:'', rol:'supervisor', activo:true};
+  modal(`<h3>${email?'Editar':'Nuevo'} usuario</h3><div class="form">
+    <label>Correo<input id="uE" type="email" value="${esc(u.email)}" ${email?'disabled':''} placeholder="nombre@empresa.cl"></label>
+    <label>Nombre<input id="uN" value="${esc(u.nombre||'')}"></label>
+    <label>Rol<select id="uR">${Object.entries(ROLES).map(([k,r])=>`<option value="${k}" ${u.rol===k?'selected':''}>${r.lbl}</option>`).join('')}</select></label>
+    <label>Estado<select id="uA"><option value="1">Activo</option><option value="0" ${u.activo===false?'selected':''}>Desactivado</option></select></label>
+    ${!email && Store.mode==='firebase'?`<label class="full" style="flex-direction:row;gap:8px;align-items:center"><input type="checkbox" id="uC" checked> Crear su cuenta de acceso y enviarle un correo para que defina su contraseña</label>`:''}
+    </div>
+    <p class="small muted">El rol controla qué ve y qué puede modificar; las reglas de Firestore lo hacen cumplir en el servidor.</p>
+    <div class="actions">${email && email!==Sess.email?`<button class="btn dan" onclick="borrarUsuario('${esc(email)}')">Quitar acceso</button>`:''}<span style="flex:1"></span><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn pri" onclick="guardarUsuario(${email?`'${esc(email)}'`:'null'})">Guardar</button></div>`);
+}
+async function guardarUsuario(email){
+  const em = (email || $('#uE').value).trim().toLowerCase();
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){ toast('Correo no válido'); return; }
+  if(!email && Store.data.usuarios.find(x=>x.email===em)){ toast('Ese correo ya está registrado'); return; }
+  if(em===Sess.email && $('#uR').value!=='admin'){ toast('No puedes quitarte el rol de administrador'); return; }
+  const o = {...(Store.data.usuarios.find(x=>x.email===em)||{creado:new Date().toISOString()}), id:em, email:em, nombre:$('#uN').value.trim(), rol:$('#uR').value, activo:$('#uA').value==='1'};
+  await Store.put('usuarios', o);
+  if(!email && $('#uC')?.checked){
+    try{
+      const app2 = firebase.apps.find(a=>a.name==='alta') || firebase.initializeApp(window.FLUXCAJA_FIREBASE, 'alta');
+      try{ await app2.auth().createUserWithEmailAndPassword(em, crypto.getRandomValues(new Uint32Array(4)).join('-')+'Aa!'); }
+      catch(e){ if(e.code!=='auth/email-already-in-use') throw e; }
+      await app2.auth().sendPasswordResetEmail(em); await app2.auth().signOut();
+      toast('Usuario creado: le llegará un correo para definir su contraseña', 5000);
+    }catch(e){ alert('El rol quedó guardado, pero no se pudo crear la cuenta de acceso: '+(e.code||e.message)+'\nPuedes crearla en Firebase Console › Authentication.'); }
+  } else toast('Usuario guardado');
+  closeModal();
+}
+async function borrarUsuario(email){ if(!confirm('¿Quitar el acceso de '+email+'? (La cuenta de Firebase queda, pero sin rol no puede ver datos.)')) return; await Store.del('usuarios', email); closeModal(); toast('Acceso quitado'); }
+
+/* =====================================================================
+   COMPROMISOS FORESTALES (compra de bosque en pie / madera)
+   Se guardan en fc_movimientos con origen 'forestal' y creadoPor = correo del supervisor.
+   ===================================================================== */
+const CAT_FOR = 'Compra de madera y bosques';
+const TIPOS_NEG = ['Bosque en pie','Madera puesta en planta','Madera orilla de camino','Otro'];
+const ESPECIES = ['Pino radiata','Eucalyptus globulus','Eucalyptus nitens','Nativo','Otra'];
+const UNIDADES = ['m³','m³ ssc','m³ ssc (pulgadas)','ton','ha'];
+UI.for = {estado:'pend', sup:'*', q:''};
+function misCompromisos(){
+  return Store.data.movimientos.filter(m => m.origen==='forestal' && (!esSupervisor() || m.creadoPor===Sess.email) && (UI.emp==='*' || m.empresaId===UI.emp));
+}
+function resumenNeg(m){ const f = m.forestal||{}; return [f.tipoNegocio, f.predio, f.especie, f.volumen? `${Number(f.volumen).toLocaleString('es-CL')} ${f.unidad||''}`:''].filter(Boolean).join(' · '); }
+function viewForestal(){
+  const f = UI.for; const q = f.q.trim().toLowerCase(); const t = today(), lim = addDays(t,30);
+  let ms = misCompromisos();
+  const sups = [...new Set(ms.map(m=>m.creadoPor))].sort();
+  ms = ms.filter(m => (f.estado==='*' || (f.estado==='pend'? m.estado!=='pagado' : m.estado==='pagado')) && (f.sup==='*' || m.creadoPor===f.sup) &&
+    (!q || [m.contraparte, m.rut, m.glosa, resumenNeg(m), m.forestal?.detalle, m.creadoNombre].join(' ').toLowerCase().includes(q))).sort((a,b)=>fEf(a).localeCompare(fEf(b)));
+  const pend = ms.filter(m=>m.estado!=='pagado');
+  const tot = pend.reduce((s,m)=>s+m.monto,0), t30 = pend.filter(m=>fEf(m)<=lim).reduce((s,m)=>s+m.monto,0);
+  const est = pend.filter(m=>m.forestal?.estadoNeg==='Estimado').reduce((s,m)=>s+m.monto,0);
+  const porMes = {}; pend.forEach(m=>{ const k=fEf(m).slice(0,7); porMes[k]=(porMes[k]||0)+m.monto; });
+  const negocios = new Set(pend.map(m=>m.grupo||m.id)).size;
+  return `<div class="kpis">
+    <div class="kpi"><div class="l">Comprometido</div><div class="v neg">${fmt(tot)}</div><div class="s">pendiente · ${negocios} negocio(s), ${pend.length} pago(s)</div></div>
+    <div class="kpi"><div class="l">Próximos 30 días</div><div class="v">${fmt(t30)}</div><div class="s">hasta el ${fDate(lim)}</div></div>
+    <div class="kpi"><div class="l">Estimado</div><div class="v ${est?'':'pos'}">${fmt(est)}</div><div class="s">sin confirmar · ${tot? Math.round(est/tot*100):0}% del total</div></div>
+    ${!esSupervisor()?`<div class="kpi"><div class="l">Supervisores</div><div class="v">${sups.length}</div><div class="s">con compromisos registrados</div></div>`:''}
+  </div>
+  <div class="card">
+    <div class="row">
+      <label>Buscar<input id="forQ" value="${esc(f.q)}" placeholder="Proveedor, predio, detalle…" oninput="UI.for.q=this.value;debFor()"></label>
+      <label>Estado<select onchange="UI.for.estado=this.value;render()">${[['pend','Pendientes'],['pag','Pagados'],['*','Todos']].map(([k,l])=>`<option value="${k}" ${f.estado===k?'selected':''}>${l}</option>`).join('')}</select></label>
+      ${!esSupervisor()?`<label>Supervisor<select onchange="UI.for.sup=this.value;render()"><option value="*">Todos</option>${sups.map(s=>`<option value="${esc(s)}" ${f.sup===s?'selected':''}>${esc(nombreUsuario(s))}</option>`).join('')}</select></label>`:''}
+    </div>
+    <div class="tw" style="margin-top:12px;max-height:65vh"><table class="cards"><thead><tr><th>Fecha pago</th>${UI.emp==='*'?'<th>Empresa</th>':''}<th>Proveedor</th><th>Negocio</th><th>Estado</th>${!esSupervisor()?'<th>Supervisor</th>':''}<th class="n">Monto</th><th></th></tr></thead><tbody>
+    ${ms.slice(0,500).map(m=>`<tr class="${m.estado==='pagado'?'pagado':''}">
+      <td data-l="Fecha pago" class="${m.estado!=='pagado'&&fEf(m)<t?'neg':''}">${fDate(fEf(m))}${m.cuota?` <span class="small muted">${esc(m.cuota)}</span>`:''}</td>
+      ${UI.emp==='*'?`<td data-l="Empresa">${esc(empresa(m.empresaId)?.nombre||'')}</td>`:''}
+      <td data-l="Proveedor" style="white-space:normal">${esc(m.contraparte||'')}${m.rut?` <span class="small muted">${esc(m.rut)}</span>`:''}</td>
+      <td data-l="Negocio" style="white-space:normal">${esc(resumenNeg(m))}</td>
+      <td data-l="Estado">${m.estado==='pagado'?'<span class="tag cxc">Pagado</span>':`<span class="tag ${m.forestal?.estadoNeg==='Confirmado'?'forestal':'man'}">${esc(m.forestal?.estadoNeg||'Estimado')}</span>`}</td>
+      ${!esSupervisor()?`<td data-l="Supervisor">${esc(m.creadoNombre||m.creadoPor||'')}</td>`:''}
+      <td class="n neg" data-l="Monto">${fmt(m.monto)}</td>
+      <td><button class="btn sm" onclick="verNegocio('${m.id}')">Ver</button>${editableForestal(m)?` <button class="btn sm" onclick="editForestal('${m.id}')">Editar</button>`:''}</td></tr>`).join('') || `<tr><td colspan="8" class="muted">Sin compromisos${puedeForestal()?' · usa “+ Compromiso” para registrar uno':''}</td></tr>`}
+    </tbody></table></div>
+  </div>
+  ${!esSupervisor() && Object.keys(porMes).length?`<div class="card"><h2>Pagos comprometidos por mes</h2><div class="tw"><table><tbody>${Object.keys(porMes).sort().map(k=>`<tr><td>${MES[+k.slice(5)-1]}-${k.slice(0,4)}</td><td class="n neg">${fmt(porMes[k])}</td></tr>`).join('')}</tbody></table></div></div>`:''}`;
+}
+let _dfo; function debFor(){ clearTimeout(_dfo); _dfo=setTimeout(()=>{ const pos=$('#forQ')?.selectionStart; render(); const i=$('#forQ'); if(i){ i.focus(); try{i.setSelectionRange(pos,pos);}catch(e){} } },250); }
+const nombreUsuario = em => Store.data.usuarios.find(u=>u.email===em)?.nombre || Store.data.movimientos.find(m=>m.creadoPor===em && m.creadoNombre)?.creadoNombre || em;
+
+function editForestal(id){
+  const m = id ? Store.data.movimientos.find(x=>x.id===id) : null;
+  if(m && !editableForestal(m)){ verNegocio(id); return; }
+  const f = m?.forestal || {};
+  const eid = m?.empresaId || (UI.emp!=='*' ? UI.emp : E()[0]?.id);
+  if(!eid){ toast('No hay empresas creadas'); return; }
+  _auxSel = m?.auxId && aux(m.auxId) ? m.auxId : null;
+  window._movImp = false;
+  modal(`<h3>${m?'Editar':'Nuevo'} compromiso forestal</h3>
+  <div class="form">
+    <input type="hidden" id="mK" value="${CAT_FOR}">
+    <label>Empresa compradora<select id="fE">${E().map(e=>`<option value="${e.id}" ${eid===e.id?'selected':''}>${esc(e.nombre)}</option>`).join('')}</select></label>
+    <label>Tipo de negocio<select id="fT">${TIPOS_NEG.map(t=>`<option ${f.tipoNegocio===t?'selected':''}>${t}</option>`).join('')}</select></label>
+    <div class="fld full"><span>Proveedor / vendedor *</span>
+      <div class="ac"><input id="mAux" autocomplete="off" placeholder="Buscar por RUT o nombre…" value="${esc(m? (m.contraparte||'')+(m.rut?' · '+m.rut:'') : '')}"
+        oninput="_auxSel=null;auxBuscar()" onfocus="auxBuscar()" onblur="setTimeout(auxCerrar,150)" onkeydown="auxTecla(event)"><div id="mAuxL" class="ac-list hide"></div></div>
+      <span id="auxInfo" class="aux-ok"></span>
+      <div id="auxNew" class="docbox sub hide" style="margin-top:6px"><label>RUT<input id="anR" placeholder="76.123.456-7"></label><label>Nombre / razón social<input id="anN"></label>
+        <button class="btn pri sm" type="button" onclick="auxCrearInline()">Guardar</button><button class="btn sm" type="button" onclick="$('#auxNew').classList.add('hide')">Cancelar</button></div></div>
+    <label>Predio / ubicación<input id="fP" value="${esc(f.predio||'')}" placeholder="Ej: Fundo Los Robles, Collipulli"></label>
+    <label>Especie<select id="fS">${ESPECIES.map(t=>`<option ${f.especie===t?'selected':''}>${t}</option>`).join('')}</select></label>
+    <label>Volumen / cantidad<input id="fV" type="number" inputmode="decimal" step="any" value="${f.volumen??''}" oninput="forCalc()"></label>
+    <label>Unidad<select id="fU">${UNIDADES.map(t=>`<option ${f.unidad===t?'selected':''}>${t}</option>`).join('')}</select></label>
+    <label>Precio unitario (opcional)<input id="fPr" type="number" inputmode="numeric" value="${f.precio??''}" oninput="forCalc()"></label>
+    <label>Monto ${m?'de este pago':'total'} *<input id="fM" type="number" inputmode="numeric" value="${m?.monto??''}"></label>
+    <label>Fecha compromiso de pago *<input id="fF" type="date" value="${m?.fecha||addDays(today(),7)}"></label>
+    <label>Estado del negocio<select id="fN"><option ${f.estadoNeg!=='Confirmado'?'selected':''}>Estimado</option><option ${f.estadoNeg==='Confirmado'?'selected':''}>Confirmado</option></select></label>
+    ${!m?`<label>Pagar en N cuotas<input id="fC" type="number" min="1" max="36" value="1"></label>
+      <label>Frecuencia de cuotas<select id="fR"><option value="m">Mensual</option><option value="q">Quincenal</option><option value="s">Semanal</option></select></label>`:''}
+    <label class="full">Detalle del negocio *<textarea id="fD" rows="3" placeholder="Condiciones, rodal, acceso, calidad, quién cosecha, anticipo…">${esc(f.detalle||'')}</textarea></label>
+    <input type="hidden" id="mFo">
+  </div>
+  <div class="actions">${m?`<button class="btn dan" onclick="borrarForestal('${m.id}')">Eliminar</button>`:''}<span style="flex:1"></span><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn pri" onclick="guardarForestal(${m?`'${m.id}'`:'null'})">Guardar</button></div>`);
+  auxInfo();
+}
+function forCalc(){ const v = +$('#fV').value, p = +$('#fPr').value; if(v && p) $('#fM').value = Math.round(v*p); }
+async function guardarForestal(id){
+  const a = _auxSel && aux(_auxSel);
+  if(!a){ toast('Selecciona el proveedor desde el buscador (o créalo)'); $('#mAux').focus(); return; }
+  const monto = Math.round(+$('#fM').value||0), fecha = $('#fF').value, detalle = $('#fD').value.trim();
+  if(!monto || monto<0){ toast('Ingresa el monto'); return; }
+  if(!fecha){ toast('Ingresa la fecha del compromiso de pago'); return; }
+  if(!detalle){ toast('Describe el negocio en el detalle'); $('#fD').focus(); return; }
+  const forestal = {tipoNegocio:$('#fT').value, predio:$('#fP').value.trim(), especie:$('#fS').value, volumen: $('#fV').value===''?null:+$('#fV').value, unidad:$('#fU').value, precio: $('#fPr').value===''?null:+$('#fPr').value, estadoNeg:$('#fN').value, detalle};
+  const eid = $('#fE').value; const ahora = new Date().toISOString();
+  const base = {empresaId:eid, tipo:'egreso', categoria:CAT_FOR, origen:'forestal', contraparte:a.nombre, rut:a.rut, auxId:a.id, forestal, glosa: [forestal.tipoNegocio, forestal.predio].filter(Boolean).join(' · ')};
+  if(id){
+    const m = Store.data.movimientos.find(x=>x.id===id);
+    await Store.put('movimientos', {...m, ...base, fecha, monto, actualizado:ahora, actualizadoPor:Sess.email}); closeModal(); toast('Compromiso actualizado'); return;
+  }
+  const n = Math.max(1, Math.min(36, +($('#fC')?.value)||1)), fr = $('#fR')?.value||'m';
+  const grupo = n>1 ? uid() : null; const cuota = Math.floor(monto/n);
+  const def = puedeEscribir() ? (cuentasDe(eid).find(c=>c.porDefecto)||cuentasDe(eid)[0]) : null;
+  const out = [];
+  for(let i=0;i<n;i++){
+    const f = fr==='m'? addMonths(fecha,i) : addDays(fecha, (fr==='s'?7:14)*i);
+    out.push({...base, id:uid(), fecha:f, monto: i===n-1 ? monto-cuota*(n-1) : cuota, estado:'pendiente', cuentaId:def?.id||null, grupo, cuota: n>1?`${i+1}/${n}`:null, creadoPor:Sess.email, creadoNombre:Sess.nombre||Sess.email, creado:ahora});
+  }
+  try{ await Store.putMany('movimientos', out); closeModal(); toast(n>1? `Compromiso registrado en ${n} cuotas` : 'Compromiso registrado'); }
+  catch(e){ alert('No se pudo guardar: '+(e.code||e.message)); }
+}
+async function borrarForestal(id){
+  const m = Store.data.movimientos.find(x=>x.id===id);
+  const serie = m.grupo ? Store.data.movimientos.filter(x=>x.grupo===m.grupo && x.estado!=='pagado' && editableForestal(x)) : [m];
+  if(!confirm(serie.length>1? `¿Eliminar las ${serie.length} cuotas pendientes de este negocio?` : '¿Eliminar este compromiso?')) return;
+  await Store.delMany('movimientos', serie.map(x=>x.id)); closeModal(); toast('Compromiso eliminado');
+}
+function verNegocio(id){
+  const m = Store.data.movimientos.find(x=>x.id===id); if(!m) return; const f = m.forestal||{};
+  const serie = m.grupo ? Store.data.movimientos.filter(x=>x.grupo===m.grupo).sort((a,b)=>a.fecha.localeCompare(b.fecha)) : [m];
+  const totNeg = serie.reduce((s,x)=>s+x.monto,0);
+  const fila = (l,v) => v? `<tr><td class="muted" style="width:38%">${l}</td><td style="white-space:normal"><b>${v}</b></td></tr>` : '';
+  modal(`<h3>${esc(f.tipoNegocio||'Compromiso forestal')} · ${esc(m.contraparte||'')} <span class="tag ${m.estado==='pagado'?'cxc':f.estadoNeg==='Confirmado'?'forestal':'man'}">${m.estado==='pagado'?'Pagado':esc(f.estadoNeg||'Estimado')}</span></h3>
+    <div class="kpis">${kpiMini('Este pago', fmt(m.monto), fDate(fEf(m))+(m.cuota?' · cuota '+m.cuota:''), 'neg')}${kpiMini('Total del negocio', fmt(totNeg), serie.length+' pago(s)')}${f.volumen?kpiMini('Volumen', Number(f.volumen).toLocaleString('es-CL')+' '+esc(f.unidad||''), f.precio? fmt(f.precio)+' por '+esc(f.unidad||'unidad'):''):''}</div>
+    <div class="tw"><table><tbody>
+      ${fila('Empresa compradora', esc(empresa(m.empresaId)?.nombre||''))}${fila('Proveedor', esc(m.contraparte||'')+(m.rut?' · '+esc(m.rut):''))}
+      ${fila('Tipo de negocio', esc(f.tipoNegocio))}${fila('Predio / ubicación', esc(f.predio))}${fila('Especie', esc(f.especie))}
+      ${fila('Detalle', esc(f.detalle).replace(/\n/g,'<br>'))}
+      ${fila('Registrado por', esc(m.creadoNombre||m.creadoPor||'')+(m.creado?' · '+fDate(m.creado.slice(0,10)):''))}${m.actualizado?fila('Última modificación', fDate(m.actualizado.slice(0,10))+' · '+esc(m.actualizadoPor||'')):''}
+      ${m.estado==='pagado'?fila('Pagado', fDate(m.fechaPago)+' · '+esc(cuentaLabel(cuenta(m.cuentaId)))):''}
+    </tbody></table></div>
+    ${serie.length>1?`<h3 style="font-size:14px;margin:14px 0 6px">Calendario de pagos</h3><div class="tw"><table><tbody>${serie.map(x=>`<tr class="${x.id===m.id?'sel':''}"><td>${esc(x.cuota||'')}</td><td>${fDate(fEf(x))}</td><td>${x.estado==='pagado'?'<span class="tag cxc">Pagado</span>':'<span class="tag">Pendiente</span>'}</td><td class="n">${fmt(x.monto)}</td></tr>`).join('')}</tbody></table></div>`:''}
+    <div class="actions"><button class="btn" onclick="closeModal()">Cerrar</button>${editableForestal(m)?`<button class="btn" onclick="editForestal('${m.id}')">Editar</button>`:''}${puedeEscribir()&&m.estado!=='pagado'?`<button class="btn pri" onclick="pagarMovs(['${m.id}'])">✓ Dar por pagado</button>`:''}</div>`, true);
 }
 
 /* ---------- Auxiliar de clientes y proveedores ---------- */
@@ -1563,7 +1806,8 @@ function verVersion(){
     <div class="actions">${window._bip?'<button class="btn" onclick="_bip.prompt()">Instalar app</button>':''}<button class="btn" onclick="actualizarApp()">Buscar actualización</button><button class="btn pri" onclick="closeModal()">Cerrar</button></div>`);
 }
 function menuUsuario(){
-  modal(`<h3>Sesión</h3><p>Usuario: <b>${esc(Store.user?.email||'')}</b></p>
+  if(Store.mode!=='firebase'){ modal(`<h3>Modo local</h3><p>Viendo como <b>${esc(ROLES[Sess.rol].lbl)}</b>.</p><div class="seg">${Object.entries(ROLES).map(([k,r])=>`<button class="${Sess.rol===k?'on':''}" onclick="closeModal();simularRol('${k}')">${r.lbl}</button>`).join('')}</div><div class="actions"><button class="btn" onclick="closeModal()">Cerrar</button></div>`); return; }
+  modal(`<h3>Sesión</h3><p>${esc(Sess.nombre||'')}<br>Usuario: <b>${esc(Sess.email||'')}</b><br>Rol: <b>${esc(ROLES[Sess.rol]?.lbl||'')}</b></p>
     <div class="actions"><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn dan" onclick="closeModal();firebase.auth().signOut()">Cerrar sesión</button></div>`);
 }
 function exportJSON(){
@@ -1598,6 +1842,10 @@ async function cargarDemo(){
   const rutDe = n => rv((n.startsWith('Exp')||n.startsWith('Ase')||n.startsWith('Fri') ? 96500000 : 77100000) + [...n].reduce((h,c)=>(h*31+c.charCodeAt(0))%9973,7));
   mv.forEach(m=>{ if(m.rut){ m.rut = rutDe(m.contraparte); m.auxId = auxId(m.rut); } });
   await upsertAux(mv.filter(m=>m.rut).map(m=>({rut:m.rut, nombre:m.contraparte, tipo:m.origen==='cxc'?'cliente':'proveedor'})));
+  const neg = [['Bosque en pie','Fundo Los Robles, Collipulli','Pino radiata',1200,'m³ ssc',18500,'Confirmado',3],['Madera orilla de camino','Predio El Maitén, Angol','Eucalyptus globulus',450,'m³',32000,'Estimado',1]];
+  const provF = [{rut:fmtRut('11111111'),nombre:'Juan Pérez (propietario)'},{rut:fmtRut('22222222'),nombre:'Forestal San Luis SpA'}];
+  neg.forEach(([tn,pr,es,vol,un,pre,est,n],k)=>{ const g=n>1?uid():null, tot=vol*pre; for(let i=0;i<n;i++) mv.push({id:uid(),empresaId:e1.id,cuentaId:c1.id,tipo:'egreso',categoria:'Compra de madera y bosques',origen:'forestal',fecha:addMonths(addDays(t,12+k*9),i),monto:Math.round(tot/n),contraparte:provF[k].nombre,rut:provF[k].rut,auxId:auxId(provF[k].rut),estado:'pendiente',grupo:g,cuota:n>1?`${i+1}/${n}`:null,forestal:{tipoNegocio:tn,predio:pr,especie:es,volumen:vol,unidad:un,precio:pre,estadoNeg:est,detalle:'Negocio de ejemplo: cosecha a cargo del vendedor, pago contra despacho.'},glosa:tn+' · '+pr,creadoPor:'supervisor@local',creadoNombre:'Supervisor de prueba',creado:new Date().toISOString()}); });
+  await upsertAux(provF.map(p=>({...p,tipo:'proveedor'})));
   await Store.putMany('empresas',[e1,e2]); await Store.putMany('cuentas',[c1,c2,c3]); await Store.putMany('movimientos',mv); toast('Datos de ejemplo cargados');
 }
 

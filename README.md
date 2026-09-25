@@ -17,8 +17,9 @@ App web instalable (PWA) para PC y celular. Se aloja en GitHub Pages y guarda lo
 ### 1. Firebase
 1. Entra a console.firebase.google.com y crea un proyecto (o usa uno existente: las colecciones llevan prefijo `fc_`, así que no chocan con otras apps).
 2. **Firestore Database** › Crear base de datos › modo producción › región `southamerica-east1` (São Paulo).
-3. **Firestore › Reglas**: pega el contenido de `firestore.rules` y publica.
-4. **Authentication** › Comenzar › habilita **Correo electrónico/contraseña** › pestaña Usuarios › agrega tu usuario (y los de quienes usarán la app).
+3. **Firestore › Reglas**: abre `firestore.rules`, reemplaza `TU_CORREO@dominio.cl` (función `ADMINS`) por el correo con que inicias sesión, pega el contenido y publica.
+4. **Authentication** › Comenzar › habilita **Correo electrónico/contraseña** › pestaña Usuarios › agrega tu propio usuario. El resto de los usuarios se crea desde la app (pestaña Usuarios).
+5. Entra a la app con tu correo: aparece *Sin acceso asignado* › **Activar como administrador** (solo funciona para los correos de `ADMINS`).
 5. **Configuración del proyecto** › Tus apps › icono Web `</>` › registra la app › copia el objeto `firebaseConfig` y pégalo en `config.js`.
 6. **Authentication › Configuración › Dominios autorizados**: agrega `tuusuario.github.io`.
 
@@ -49,6 +50,18 @@ App web instalable (PWA) para PC y celular. Se aloja en GitHub Pages y guarda lo
 8. **Conciliación (semanal):** saldo teórico = último saldo real ingresado + pagos y cobros dados por pagados después de esa fecha. Cada semana se ingresa el saldo real de la cartola y la app muestra la diferencia. El análisis lista los compromisos pendientes con fecha en el período (★ = importe igual a la diferencia) para darlos por pagados, y permite registrar el documento faltante. Si la diferencia no se explica con pendientes, falta registrar documentos.
 9. **Reprogramar:** en Movimientos, selecciona documentos › *Reprogramar fecha*. La fecha original se conserva y la reprogramación no se pierde al reimportar.
 
+10. **Compromisos forestales:** los supervisores registran desde el celular la compra de bosque en pie, madera puesta en planta u orilla de camino: empresa compradora, proveedor (buscador del auxiliar), predio, especie, volumen y precio, monto, fecha del compromiso de pago (en cuotas si corresponde), estado *Estimado/Confirmado* y el detalle del negocio. Entran al flujo como **Compra de madera y bosques**; al hacer clic la gerencia ve cada negocio con **Ver negocio** (detalle, quién lo registró y calendario de pagos). En el flujo se puede excluir lo *Estimado*.
+
+## Usuarios y roles
+| Rol | Ve | Puede |
+|---|---|---|
+| Administrador | Todo | Todo, y crear usuarios y asignar roles |
+| Finanzas | Todo menos Usuarios | Cargar, pagar, conciliar, editar compromisos |
+| Gerencia | Flujo, Movimientos, Compromisos forestales, Conciliación | Solo consultar (abrir detalles) |
+| Supervisor forestal | Solo *Mis compromisos* | Crear, editar y borrar sus compromisos pendientes |
+
+Los permisos los hace cumplir Firestore (`firestore.rules`), no solo la pantalla: un supervisor no puede leer saldos ni documentos de otros. Para agregar a alguien: *Usuarios* › *+ Usuario* (correo, nombre, rol); la app crea su cuenta y le envía un correo para definir su contraseña. En la pantalla de ingreso está *¿Olvidaste tu contraseña?*. En modo local, el círculo de la barra superior permite simular cada rol.
+
 ### Rutina semanal sugerida
 Importar el REGISTRO FLUJO CAJA › dar por pagados los compromisos que pasaron por el banco › ingresar el saldo real de cada cuenta en Conciliación › revisar diferencias › revisar el flujo.
 
@@ -56,4 +69,4 @@ Importar el REGISTRO FLUJO CAJA › dar por pagados los compromisos que pasaron 
 La versión se ve junto al nombre en la barra superior; al hacer clic se abre el historial de cambios y el botón *Buscar actualización*. La sesión se cierra desde el círculo con las iniciales del usuario. Ajustes contiene solo Respaldo y Limpieza, y la app siempre abre en Flujo de caja.
 Al publicar una versión nueva se actualizan juntos `APP_VERSION` en `index.html` y `VERSION` en `sw.js` (ej. `1.2.0` / `fcc-1.2.0`); así los equipos instalados descargan el cambio.
 
-Versión actual: **1.8.2**
+Versión actual: **1.9.0**

@@ -1,6 +1,6 @@
 /* Flujo de Caja Consolidado · service worker: app instalable y funcionamiento offline.
    Sube VERSION cada vez que publiques cambios para forzar la actualización. */
-const VERSION = 'fcc-1.8.2';   // debe coincidir con APP_VERSION de index.html
+const VERSION = 'fcc-1.9.0';   // debe coincidir con APP_VERSION de index.html
 const SHELL = ['./', './index.html', './config.js', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
 const CDN = ['cdnjs.cloudflare.com', 'www.gstatic.com'];
 
